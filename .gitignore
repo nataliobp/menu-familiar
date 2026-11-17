@@ -17,3 +17,6 @@ staticfiles/
 !.env.example
 *.pem
 *.key
+
+# IDE configuration
+.idea/
