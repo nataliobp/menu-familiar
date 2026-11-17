@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+db.sqlite3
+staticfiles/
+
+# Private family data
+/PLATOS_57.csv
+/data/
+*.sqlite3
+*.sqlite3-*
+/backups/
+
+# Secrets and local configuration
+.env.*
+!.env.example
+*.pem
+*.key
