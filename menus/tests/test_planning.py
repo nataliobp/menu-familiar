@@ -173,3 +173,40 @@ class PlanningTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertContains(response, token, status_code=503)
         self.assertContains(response, "Producte de prova", status_code=503)
+
+    def test_recipe_conflict_shows_submitted_and_current_values(self):
+        from unittest.mock import patch
+        from django.urls import reverse
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            url = reverse("recipe_publish", args=[self.dish.pk])
+            data = {"version": 1, "preparation": "Preparació actual", "name": ["Arròs"], "quantity": ["160"], "unit": ["g"], "note": [""]}
+            self.assertEqual(self.client.post(url, data).status_code, 302)
+            data["preparation"] = "Preparació enviada"
+            response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 409)
+        self.assertContains(response, "Preparació actual", status_code=409)
+        self.assertContains(response, "Preparació enviada", status_code=409)
+
+    def test_move_failure_after_slot_write_rolls_back_root_and_undo(self):
+        from unittest.mock import patch
+        from django.db.models.query import QuerySet
+        from menus.application.planning import move_or_undo
+        from menus.models import MenuSlotRecord
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        original = QuerySet.update
+        writes = 0
+        def fail_on_second_slot(queryset, **kwargs):
+            nonlocal writes
+            if queryset.model is MenuSlotRecord:
+                writes += 1
+                if writes == 2:
+                    raise RuntimeError("synthetic write failure")
+            return original(queryset, **kwargs)
+        with patch.object(QuerySet, "update", fail_on_second_slot), self.assertRaises(RuntimeError):
+            move_or_undo(self.repo, self.clock, self.week, 2, (0, "lunch"), (1, "lunch"))
+        menu = self.repo.get(self.week)
+        self.assertEqual(menu.version, 2)
+        self.assertEqual(menu.slots[(0, "lunch")].state, "selected")
+        self.assertEqual(menu.slots[(1, "lunch")].state, "pending")
+        self.assertIsNone(menu.undo)

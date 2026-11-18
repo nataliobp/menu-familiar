@@ -99,3 +99,7 @@ def move_or_undo(repo, clock, week, version, source=None, destination=None, conf
         if monday(clock.today()) != current:
             raise Rollover()
         return menu
+
+
+def get_menu(repo, week):
+    return repo.get(week)

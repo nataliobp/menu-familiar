@@ -1,6 +1,7 @@
 from decimal import Decimal
 from menus.domain.shopping import aggregate
 from menus.models import ShoppingStateRecord
+from menus.application.shopping_views import ManualItemView, OverlayView, ShoppingStateView
 
 
 def reconcile(menu):
@@ -69,10 +70,11 @@ class DjangoShoppingRepository:
                     raise ValueError("Invalid taste overlay")
         else:
             saved = []
-        overlays = {(o.ingredient_key, o.family): o for o in saved}
+        overlays = {(o.ingredient_key, o.family): OverlayView(o.ingredient_key, o.family, o.last_name, o.last_base_quantity, o.adjusted_quantity, o.checked) for o in saved}
         for row in rows:
             row["overlay"] = overlays.pop(row["key"], None)
-        return menu, state, rows, pending, incomplete, list(overlays.values())
+        state_view = ShoppingStateView(state.version, tuple(ManualItemView(item.pk, item.name, item.quantity, item.unit, item.checked) for item in state.manual_items.order_by("id"))) if state else None
+        return menu, state_view, rows, pending, incomplete, list(overlays.values())
 
     def manual_digest(self, week, data):
         import hashlib, json
@@ -101,9 +103,10 @@ class DjangoShoppingRepository:
         view = self.read(week)
         if view is None:
             raise ValueError("Missing menu")
-        menu, state, rows, _, _, orphans = view
-        if menu.version != menu_version or (state.version if state else 0) != overlay_version:
+        menu, state_view, rows, _, _, orphans = view
+        if menu.version != menu_version or (state_view.version if state_view else 0) != overlay_version:
             raise ShoppingConflict()
+        state = ShoppingStateRecord.objects.filter(pk=week).first()
         if not WeeklyMenuRecord.objects.filter(pk=week, version=menu_version).update(version=menu_version):
             raise ShoppingConflict()
         if state is None:
@@ -168,7 +171,15 @@ class DjangoShoppingRepository:
                 if action == "check" and data.get("checked") not in ("0", "1"):
                     raise ValueError("Invalid check state")
                 checked = data.get("checked") == "1"
-                if overlay is None:
+                if action == "adjust" and amount == format(row["quantity"], ".3f"):
+                    if overlay and overlay.adjusted_quantity is not None:
+                        if overlay.checked:
+                            overlay.adjusted_quantity = None
+                            overlay.save(update_fields=["adjusted_quantity"])
+                        else:
+                            overlay.delete()
+                        changed = True
+                elif overlay is None:
                     if action == "check" and not checked:
                         changed = False
                     else:

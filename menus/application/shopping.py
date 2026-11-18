@@ -23,3 +23,7 @@ def mutate_shopping(repo, clock, week, menu_version, overlay_version, action, da
             if replay is None:
                 raise ValueError("Missing receipt")
             return replay
+
+
+def get_shopping(repo, week):
+    return repo.read(week)

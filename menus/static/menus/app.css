@@ -21,3 +21,4 @@ button:hover { background: #e8f0e7; }
 textarea { width: min(100%, 48rem); min-height: 8rem; }
 fieldset { border: 1px solid #d9e1d7; border-radius: .7rem; margin: .7rem 0; }
 input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: #28664e; }
+.shopping-row { background: white; border: 1px solid #d9e1d7; border-radius: .65rem; padding: .75rem; margin: .5rem 0; overflow-wrap: anywhere; }

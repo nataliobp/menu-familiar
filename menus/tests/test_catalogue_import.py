@@ -127,15 +127,15 @@ class SourceFidelityTests(DjangoTestCase):
             self.skipTest("Set MENU_CATALOGUE_CSV to verify the private source")
         dishes = read_catalogue(Path(source))
         self.assertEqual(len(dishes), 57)
-        self.assertEqual({dish.id for dish in dishes}, set(range(1, 58)))
-        self.assertEqual({dish.id for dish in dishes if dish.special_occasion}, {25, 31, 43, 52, 55})
+        self.assertTrue({dish.id for dish in dishes} == set(range(1, 58)), "Unexpected source identities")
+        self.assertTrue({dish.id for dish in dishes if dish.special_occasion} == {25, 31, 43, 52, 55}, "Unexpected source flags")
         self.assertEqual(import_catalogue(dishes, DjangoCatalogueRepository()), 57)
         with Path(source).open(encoding="utf-8-sig", newline="") as input_file:
             for row in csv.DictReader(input_file):
                 record = DishRecord.objects.get(pk=int(row["id"]))
-                self.assertEqual(record.name, row["name_ca"])
-                self.assertEqual(record.primary_category.name_ca, row["primary_category"])
-                self.assertEqual(set(record.secondary_categories.values_list("category__name_ca", flat=True)),
-                                 {name.strip() for name in row["secondary_categories"].split(",") if name.strip()})
-                self.assertEqual(record.meal_preference, row["meal_preference"])
-                self.assertEqual(record.special_occasion, row["special_occasion"] == "true")
+                self.assertTrue(record.name == row["name_ca"], "Source name mismatch")
+                self.assertTrue(record.primary_category.name_ca == row["primary_category"], "Source primary category mismatch")
+                self.assertTrue(set(record.secondary_categories.values_list("category__name_ca", flat=True)) ==
+                                {name.strip() for name in row["secondary_categories"].split(",") if name.strip()}, "Source secondary categories mismatch")
+                self.assertTrue(record.meal_preference == row["meal_preference"], "Source preference mismatch")
+                self.assertTrue(record.special_occasion == (row["special_occasion"] == "true"), "Source occasion mismatch")

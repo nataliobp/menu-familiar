@@ -210,3 +210,48 @@ class PlanningConcurrencyTests(TransactionTestCase):
         recovered = create_dish(DjangoDishRepository(), data, token)
         self.assertIn(recovered, results)
         self.assertEqual(DishRecord.objects.filter(name="Plat de prova").count(), 1)
+
+    def test_archive_racing_assignment_has_serial_outcome(self):
+        from menus.application.dishes import DishConflict, set_archived
+        from menus.application.planning import PlanningConflict, change_menu
+        from menus.infrastructure.django_dishes import DjangoDishRepository
+        from menus.infrastructure.django_planning import DjangoPlanningRepository
+        from menus.models import DishRecord
+        self.require_file()
+        barrier = Barrier(2, timeout=10)
+        class SynchronizedDish(DjangoDishRepository):
+            def set_archived(self, dish_id, version, archived):
+                DishRecord.objects.get(pk=dish_id)
+                barrier.wait()
+                return super().set_archived(dish_id, version, archived)
+        class SynchronizedPlanning(DjangoPlanningRepository):
+            def dish_snapshot(self, dish_id, include_archived=False):
+                snapshot = super().dish_snapshot(dish_id, include_archived)
+                barrier.wait()
+                return snapshot
+        def archive():
+            close_old_connections()
+            try:
+                set_archived(SynchronizedDish(), self.dish.pk, 1, True)
+                return "saved"
+            except (DishConflict, DatabaseError):
+                return "rejected"
+            finally:
+                close_old_connections()
+        def assign():
+            close_old_connections()
+            try:
+                change_menu(SynchronizedPlanning(), self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+                return "saved"
+            except (PlanningConflict, ValueError, DatabaseError):
+                return "rejected"
+            finally:
+                close_old_connections()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(archive), pool.submit(assign)]
+            outcomes = [future.result(timeout=15) for future in futures]
+        self.assertCountEqual(outcomes, ["saved", "rejected"])
+        dish = DishRecord.objects.get(pk=self.dish.pk)
+        selected = self.repo.get(self.week).slots[(0, "lunch")].state == "selected"
+        self.assertEqual(dish.archived, outcomes[0] == "saved")
+        self.assertEqual(selected, outcomes[1] == "saved")

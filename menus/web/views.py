@@ -57,11 +57,11 @@ def template_edit(request, day, meal):
 from datetime import date, timedelta
 from django.db import IntegrityError, transaction
 from django.views.decorators.http import require_POST
-from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, create_menu
+from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, create_menu, get_menu
 from menus.domain.planning import monday
 from menus.infrastructure.django_planning import DjangoPlanningRepository, MadridClock
-from menus.models import DishRecord, MenuSlotRecord
-from menus.domain.recommendations import rank_candidates
+from menus.application.catalogue_queries import browse_dishes, get_dish, get_recipe, picker_dishes
+from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 
 
 def parse_week(value):
@@ -85,7 +85,7 @@ def menu_view(request, week):
     repo, clock = DjangoPlanningRepository(), MadridClock()
     try:
         with transaction.atomic():
-            menu = repo.get(week)
+            menu = get_menu(repo, week)
             editable = week >= monday(clock.today())
             if menu is None:
                 if editable:
@@ -116,7 +116,7 @@ def menu_create(request, week):
         return redirect("menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
-    except (DatabaseError, Rollover, ValueError):
+    except (DatabaseError, Rollover, ValueError, KeyError):
         return unavailable()
 
 
@@ -128,22 +128,13 @@ def menu_picker(request, week, day, meal):
     repo = DjangoPlanningRepository()
     try:
         with transaction.atomic():
-            menu = repo.get(week)
+            menu = get_menu(repo, week)
             if not menu or week < monday(MadridClock().today()):
                 raise Http404()
             slot = menu.slots[(day, meal)]
             action = request.GET.get("action", "assign")
             if action not in ("assign", "replace") or slot.state != ("pending" if action == "assign" else "selected"):
                 raise Http404()
-            records = DishRecord.objects.filter(archived=False).select_related("primary_category").prefetch_related("secondary_categories")
-            candidates = [{"id": d.pk, "name": d.name, "primary_name": d.primary_category.name_ca,
-                           "categories": {d.primary_category_id} | {c.category_id for c in d.secondary_categories.all()},
-                           "meal_preference": d.meal_preference, "special_occasion": d.special_occasion} for d in records]
-            latest = {}
-            for dish_id, week_start, day_index in MenuSlotRecord.objects.filter(dish__isnull=False).values_list("dish_id", "weekly_menu_id", "day_index"):
-                occurrence = week_start + timedelta(days=day_index)
-                if dish_id not in latest or occurrence > latest[dish_id]:
-                    latest[dish_id] = occurrence
             categories = repo.template()[1]
             category = request.GET.get("category")
             if category is None and request.GET.get("mode") != "all" and slot.suggestion:
@@ -151,7 +142,7 @@ def menu_picker(request, week, day, meal):
             if category and category not in categories:
                 raise ValueError("Unknown category")
             query = request.GET.get("q", "")
-            dishes = rank_candidates(candidates, meal, latest, category, query)
+            dishes = picker_dishes(DjangoCatalogueQueries(), meal, category, query)
         return render(request, "menus/picker.html", {"week": week, "day": day, "meal": meal, "action": action, "menu": menu, "dishes": dishes, "categories": categories.items(), "category": category, "query": query, "slot": slot})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
@@ -187,7 +178,7 @@ def slot_detail(request, week, day, meal):
         raise Http404()
     try:
         with transaction.atomic():
-            menu = DjangoPlanningRepository().get(week)
+            menu = get_menu(DjangoPlanningRepository(), week)
             if menu is None:
                 raise Http404()
             slot = menu.slots[(day, meal)]
@@ -204,7 +195,7 @@ def menu_confirm(request, week, day, meal, action):
     if day not in range(7) or meal not in MEALS or action not in ("remove", "skip"):
         raise Http404()
     try:
-        menu = DjangoPlanningRepository().get(week)
+        menu = get_menu(DjangoPlanningRepository(), week)
         if not menu:
             raise Http404()
         if week < monday(MadridClock().today()):
@@ -228,7 +219,7 @@ def move_choice(request, week, day, meal):
     if day not in range(7) or meal not in MEALS:
         raise Http404()
     try:
-        menu = DjangoPlanningRepository().get(week)
+        menu = get_menu(DjangoPlanningRepository(), week)
         if not menu or menu.slots[(day, meal)].state != "selected":
             raise Http404()
         if week < monday(MadridClock().today()):
@@ -274,10 +265,8 @@ def catalogue(request):
     query = request.GET.get("q", "")
     category = request.GET.get("category", "")
     try:
-        records = DishRecord.objects.filter(archived=archived).select_related("primary_category").prefetch_related("secondary_categories")
-        from menus.domain.recommendations import search_key
-        dishes = [d for d in records if search_key(query) in search_key(d.name) and
-                  (not category or category == d.primary_category_id or category in {c.category_id for c in d.secondary_categories.all()})]
+        with transaction.atomic():
+            dishes = browse_dishes(DjangoCatalogueQueries(), archived, category, query)
         return render(request, "menus/catalogue.html", {"dishes": dishes, "archived": archived, "query": query, "category": category, "categories": DjangoTemplateRepository().categories().items()})
     except DatabaseError:
         return unavailable()
@@ -285,20 +274,26 @@ def catalogue(request):
 
 @require_http_methods(["GET"])
 def dish_detail(request, dish_id):
-    dish = DishRecord.objects.filter(pk=dish_id).select_related("primary_category").first()
-    if dish is None:
-        raise Http404()
-    return render(request, "menus/dish.html", {"dish": dish})
+    try:
+        with transaction.atomic():
+            dish = get_dish(DjangoCatalogueQueries(), dish_id)
+            if dish is None:
+                raise Http404()
+            categories = DjangoTemplateRepository().categories()
+            secondary_labels = [categories[key] for key in dish.secondary_categories]
+        return render(request, "menus/dish.html", {"dish": dish, "secondary_labels": secondary_labels})
+    except (DatabaseError, ValueError, KeyError):
+        return unavailable()
 
 
 @require_http_methods(["GET", "POST"])
 def dish_edit(request, dish_id=None):
-    dish = DishRecord.objects.filter(pk=dish_id).first() if dish_id else None
+    dish = get_dish(DjangoCatalogueQueries(), dish_id) if dish_id else None
     if dish_id and dish is None:
         raise Http404()
     categories = DjangoTemplateRepository().categories()
     initial = {"name": dish.name, "primary": dish.primary_category_id,
-               "secondary": list(dish.secondary_categories.values_list("category_id", flat=True)),
+               "secondary": list(dish.secondary_categories),
                "preference": dish.meal_preference, "special": dish.special_occasion,
                "version": dish.version} if dish else {"preference": "both", "secondary": [], "token": str(uuid4())}
     values, error, status = initial, None, 200
@@ -333,7 +328,7 @@ from menus.application.dishes import set_archived
 def dish_archive(request, dish_id, action):
     if action not in ("archive", "restore"):
         raise Http404()
-    dish = DishRecord.objects.filter(pk=dish_id).first()
+    dish = get_dish(DjangoCatalogueQueries(), dish_id)
     if not dish:
         raise Http404()
     if request.method == "POST":
@@ -354,17 +349,16 @@ def dish_archive(request, dish_id, action):
 
 from menus.application.recipes import save_recipe
 from menus.domain.recipe import recipe_content, validate_content
-from menus.models import RecipeRecord
 
 
 @require_http_methods(["GET"])
 def recipe_view(request, dish_id):
     try:
         with transaction.atomic():
-            dish = DishRecord.objects.filter(pk=dish_id).first()
+            dish = get_dish(DjangoCatalogueQueries(), dish_id)
             if not dish:
                 raise Http404()
-            recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
+            recipe = get_recipe(DjangoCatalogueQueries(), dish_id)
     except DatabaseError:
         return unavailable()
     content = (recipe.published or recipe.draft) if recipe else None
@@ -388,17 +382,17 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
         week = parse_week(week)
         if day not in range(7) or meal not in MEALS:
             raise Http404()
-        menu = DjangoPlanningRepository().get(week)
+        menu = get_menu(DjangoPlanningRepository(), week)
         if not menu or menu.slots[(day, meal)].state != "selected":
             raise Http404()
         dish_id = menu.slots[(day, meal)].dish["dish_id"]
         if week < monday(MadridClock().today()):
             return HttpResponse("Aquesta setmana és només de consulta.", status=403)
         context = (week, (day, meal))
-    dish = DishRecord.objects.filter(pk=dish_id).first()
+    dish = get_dish(DjangoCatalogueQueries(), dish_id)
     if not dish:
         raise Http404()
-    recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
+    recipe = get_recipe(DjangoCatalogueQueries(), dish_id)
     content = (recipe.draft or recipe.published) if recipe else None
     try:
         if recipe and recipe.published is not None:
@@ -407,6 +401,7 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
             validate_content(recipe.draft)
     except ValueError:
         return unavailable()
+    saved_content = content
     lines = content["ingredients"] if content else []
     values = {"preparation": content["preparation"] if content else "", "lines": lines or [{}], "version": dish.version}
     error, status = None, 200
@@ -451,9 +446,9 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
                 error, status = "No s’ha pogut desar. Revisa les dades abans de tornar-ho a provar.", 503
         else:
             error, status = "Acció invàlida.", 400
-    return render(request, "menus/recipe_edit.html", {"dish": dish, "values": values, "error": error, "conflict": status == 409, "week": week, "day": day, "meal": meal}, status=status)
+    return render(request, "menus/recipe_edit.html", {"dish": dish, "values": values, "error": error, "conflict": status == 409, "current_content": saved_content, "week": week, "day": day, "meal": meal}, status=status)
 
-from menus.application.shopping import mutate_shopping
+from menus.application.shopping import get_shopping, mutate_shopping
 from menus.infrastructure.django_shopping import DjangoShoppingRepository, ShoppingConflict
 
 
@@ -467,11 +462,11 @@ def shopping_view(request, week):
     week = parse_week(week)
     try:
         with transaction.atomic():
-            view = DjangoShoppingRepository().read(week)
+            view = get_shopping(DjangoShoppingRepository(), week)
             if view is None:
                 return render(request, "menus/shopping.html", {"week": week})
             menu, state, rows, pending, incomplete, orphans = view
-            manual = list(state.manual_items.all()) if state else []
+            manual = list(state.manual_items) if state else []
         return render(request, "menus/shopping.html", {"week": week, "menu": menu, "state": state, "rows": rows, "pending": pending, "incomplete": incomplete, "orphans": orphans, "manual": manual, "editable": week >= monday(MadridClock().today()), "token": str(uuid4())})
     except (DatabaseError, ValueError, KeyError, ArithmeticError):
         return unavailable()
@@ -486,12 +481,12 @@ def shopping_action(request, week, action):
         data = {key: request.POST.get(key, "") for key in ("name", "quantity", "unit", "token", "id", "key", "family", "checked")}
         if action == "manual_remove" and request.POST.get("confirm") != "yes":
             with transaction.atomic():
-                view = DjangoShoppingRepository().read(week)
+                view = get_shopping(DjangoShoppingRepository(), week)
                 if view is None or not view[1]:
                     raise ValueError("Missing item")
                 if view[0].version != int(request.POST.get("menu_version", "")) or view[1].version != int(request.POST.get("overlay_version", "")):
                     raise ShoppingConflict()
-                item = view[1].manual_items.filter(pk=data["id"]).first()
+                item = next ( (item for item in view[1].manual_items if str(item.id) == data["id"]), None )
                 if not item:
                     raise ValueError("Missing item")
                 if week < monday(MadridClock().today()):
@@ -504,9 +499,9 @@ def shopping_action(request, week, action):
     except ShoppingConflict:
         try:
             with transaction.atomic():
-                current_view = DjangoShoppingRepository().read(week)
+                current_view = get_shopping(DjangoShoppingRepository(), week)
                 current_rows = current_view[2] if current_view else []
-                current_manual = list(current_view[1].manual_items.all()) if current_view and current_view[1] else []
+                current_manual = list(current_view[1].manual_items) if current_view and current_view[1] else []
         except (DatabaseError, ValueError):
             return unavailable()
         return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
@@ -546,13 +541,13 @@ def shopping_form(request, week, action, item_id=None):
         return shopping_action(request, week.isoformat(), action)
     try:
         with transaction.atomic():
-            view = DjangoShoppingRepository().read(week)
+            view = get_shopping(DjangoShoppingRepository(), week)
             if not view:
                 raise Http404()
             menu, state, rows, _, _, _ = view
             if week < monday(MadridClock().today()):
                 return HttpResponse("Aquesta setmana és només de consulta.", status=403)
-            item = state.manual_items.filter(pk=item_id).first() if state and item_id is not None else None
+            item = next((item for item in state.manual_items if item.id == item_id), None) if state and item_id is not None else None
             if item_id is not None and item is None:
                 raise Http404()
             key, family = request.GET.get("key", ""), request.GET.get("family", "")

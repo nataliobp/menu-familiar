@@ -178,3 +178,73 @@ class DishTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             GeneratedOverlayRecord.objects.create(shopping=state, ingredient_key="sal", family="taste", last_name="Sal", adjusted_quantity="1.000")
         self.assertFalse(GeneratedOverlayRecord.objects.exists())
+
+    def test_adjustment_equal_to_base_clears_override_and_keeps_check(self):
+        from menus.application.recipes import save_recipe
+        from menus.application.shopping import mutate_shopping
+        from menus.domain.recipe import recipe_content
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        dishes, plans, shopping = DjangoDishRepository(), DjangoPlanningRepository(), DjangoShoppingRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
+        save_recipe(dishes, Clock(week), dish_id, 1, recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True), True)
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        key = {"key": "arròs", "family": "g"}
+        mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {**key, "quantity": "160"})
+        self.assertIsNone(shopping.read(week)[1])
+        mutate_shopping(shopping, Clock(week), week, 2, 0, "check", {**key, "checked": "1"})
+        mutate_shopping(shopping, Clock(week), week, 2, 1, "adjust", {**key, "quantity": "200"})
+        mutate_shopping(shopping, Clock(week), week, 2, 2, "adjust", {**key, "quantity": "160"})
+        overlay = shopping.read(week)[2][0]["overlay"]
+        self.assertTrue(overlay.checked)
+        self.assertIsNone(overlay.adjusted_quantity)
+
+    def test_snapshot_refresh_rebases_unrelated_undo_and_invalidates_related(self):
+        from menus.application.planning import move_or_undo
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        a = create_dish(dishes, DishInput("Plat A", "cereals", frozenset(), "both", False), uuid4())
+        b = create_dish(dishes, DishInput("Plat B", "eggs", frozenset(), "both", False), uuid4())
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", a)
+        change_menu(plans, Clock(week), week, (2, "lunch"), 2, "assign", b)
+        move_or_undo(plans, Clock(week), week, 3, (0, "lunch"), (1, "lunch"))
+        update_dish(dishes, Clock(week), b, DishInput("Plat B nou", "eggs", frozenset(), "both", False), 1)
+        menu = plans.get(week)
+        self.assertEqual(menu.undo["eligible_version"], menu.version)
+        move_or_undo(plans, Clock(week), week, menu.version)
+        menu = plans.get(week)
+        move_or_undo(plans, Clock(week), week, menu.version, (0, "lunch"), (1, "lunch"))
+        update_dish(dishes, Clock(week), a, DishInput("Plat A nou", "cereals", frozenset(), "both", False), 1)
+        self.assertIsNone(plans.get(week).undo)
+
+    def test_archive_restore_preserves_selected_snapshot_and_picker_eligibility(self):
+        from menus.application.dishes import set_archived
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat sintètic", "cereals", frozenset(), "both", False), uuid4())
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        set_archived(dishes, dish_id, 1, True)
+        self.assertIsNone(plans.dish_snapshot(dish_id))
+        self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["name"], "Plat sintètic")
+        with self.assertRaises(ValueError):
+            change_menu(plans, Clock(week), week, (1, "lunch"), 2, "assign", dish_id)
+        set_archived(dishes, dish_id, 2, False)
+        self.assertIsNotNone(plans.dish_snapshot(dish_id))
+
+    def test_manual_item_and_check_survive_plan_recalculation(self):
+        from menus.application.shopping import mutate_shopping
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        from menus.models import ManualShoppingItemRecord
+        plans, shopping = DjangoPlanningRepository(), DjangoShoppingRepository()
+        week = date(2026, 11, 16)
+        create_menu(plans, Clock(week), week)
+        mutate_shopping(shopping, Clock(week), week, 1, 0, "manual_add", {"name": "Pa", "quantity": "2", "unit": "unit", "token": str(uuid4())})
+        item_id = ManualShoppingItemRecord.objects.get().pk
+        mutate_shopping(shopping, Clock(week), week, 1, 1, "manual_check", {"id": item_id, "checked": "1"})
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "skip")
+        view = shopping.read(week)
+        self.assertEqual(view[1].manual_items[0].name, "Pa")
+        self.assertTrue(view[1].manual_items[0].checked)
