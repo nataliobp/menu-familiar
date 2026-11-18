@@ -10,22 +10,38 @@ class DishConflict(Exception):
     pass
 
 
+class DishReceiptConflict(DishConflict):
+    pass
+
+
 class DuplicateReceipt(Exception):
     pass
 
 
-def create_dish(repo, data, token):
+def _dish_creation(data, token):
     token = UUID(str(token))
     payload = {"operation": "create_dish", "scope": "catalogue", "name": data.name,
                "primary": data.primary_category, "secondary": sorted(data.secondary_categories),
                "preference": data.meal_preference, "special": data.special_occasion}
     digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return token, digest
+
+
+def review_dish_creation(repo, data, token):
+    token, digest = _dish_creation(data, token)
+    with repo.atomic():
+        receipt = repo.receipt(token)
+    return receipt is None or receipt[:3] == ("create_dish", "catalogue", digest)
+
+
+def create_dish(repo, data, token):
+    token, digest = _dish_creation(data, token)
     try:
         with repo.atomic():
             receipt = repo.receipt(token)
             if receipt:
                 if receipt[:3] != ("create_dish", "catalogue", digest):
-                    raise DishConflict()
+                    raise DishReceiptConflict()
                 return receipt[3]
             dish_id = repo.create_dish(data)
             repo.add_receipt(token, "create_dish", "catalogue", digest, dish_id)
@@ -35,7 +51,7 @@ def create_dish(repo, data, token):
             receipt = repo.receipt(token)
             if receipt and receipt[:3] == ("create_dish", "catalogue", digest):
                 return receipt[3]
-            raise DishConflict()
+            raise DishReceiptConflict()
 
 
 def update_dish(repo, clock, dish_id, data, version):

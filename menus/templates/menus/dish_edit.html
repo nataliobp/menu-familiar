@@ -1,18 +1,37 @@
 {% extends "menus/base.html" %}{% block content %}
-<h1>{% if dish %}Edita el plat{% else %}Nou plat{% endif %}</h1>{% if error %}
+<h1>{% if dish or editing %}Edita el plat{% else %}Nou plat{% endif %}</h1>{% if error %}
 <div role="alert" tabindex="-1" autofocus>
 <p>{{ error }}</p>
   {% for field, detail in field_errors.items %}
 <p><a href="#{{ field }}">{{ detail }}</a></p>{% endfor %}
-</div>{% endif %}{% if conflict or reviewed %}
+</div>{% endif %}
+{% if target_unavailable %}
+<p>Nom enviat: {{ values.name }}</p>
+<a href="{% url 'catalogue' %}">Torna al catàleg</a>
+{% elif retry_read %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="version" value="{{ values.version }}">
+  <input type="hidden" name="token" value="{{ values.token }}">
+  <input type="hidden" name="primary" value="{{ values.primary }}">
+  {% for key in values.secondary %}<input type="hidden" name="secondary" value="{{ key }}">{% endfor %}
+  <input type="hidden" name="preference" value="{{ values.preference }}">
+  {% if values.special %}<input type="hidden" name="special" value="on">{% endif %}
+  <label for="name">Nom enviat</label>
+  <input id="name" name="name" value="{{ values.name }}" maxlength="200">
+  <button name="action" value="retry_read">Torna a obrir el formulari</button>
+</form>
+<a href="{% url 'catalogue' %}">Cancel·la</a>
+{% else %}
+{% if conflict or reviewed %}
 <p>Nom enviat: {{ values.name }}</p>
 <p>Categoria principal enviada: {% for key, label in categories %}{% if key == values.primary %}{{ label }}{% endif %}{% endfor %}</p>
 <p>Categories secundàries enviades: {% for key, label in categories %}{% if key in values.secondary %}{{ label }} {% endif %}{% endfor %}</p>
 <p>Preferència enviada: {% if values.preference == "lunch" %}Dinar{% elif values.preference == "dinner" %}Sopar{% else %}Tots dos{% endif %}{% if values.special %} · Ocasió especial{% endif %}</p>
-<p>Nom actual: {{ dish.name }}</p>
+{% if dish %}<p>Nom actual: {{ dish.name }}</p>
 <p>Categoria principal actual: {{ dish.primary_category.name_ca }}</p>
 <p>Categories secundàries actuals: {% for key, label in categories %}{% if key in dish.secondary_categories %}{{ label }} {% endif %}{% endfor %}</p>
-<p>Preferència actual: {% if dish.meal_preference == "lunch" %}Dinar{% elif dish.meal_preference == "dinner" %}Sopar{% else %}Tots dos{% endif %}{% if dish.special_occasion %} · Ocasió especial{% endif %}</p>{% endif %}
+<p>Preferència actual: {% if dish.meal_preference == "lunch" %}Dinar{% elif dish.meal_preference == "dinner" %}Sopar{% else %}Tots dos{% endif %}{% if dish.special_occasion %} · Ocasió especial{% endif %}</p>{% endif %}{% endif %}
 <form method="post">{% csrf_token %}
 <input type="hidden" name="version" value="{{ values.version }}">
 <input type="hidden" name="token" value="{{ values.token }}"><label for="name">Nom</label>
@@ -24,6 +43,7 @@
 <input type="checkbox" name="special" {% if values.special %}checked{% endif %}>Ocasió especial</label>{% for field, detail in field_errors.items %}
 <p id="{{ field }}-error">{{ detail }}</p>{% endfor %}{% if conflict %}
 <button name="action" value="review">Revisa el valor actual</button>{% else %}
-<button>Desa</button>{% endif %}
+<button>{% if new_creation %}Crea un plat nou{% else %}Desa{% endif %}</button>{% endif %}
 </form><a href="{% url 'catalogue' %}">Cancel·la</a>
+{% endif %}
 {% endblock %}

@@ -1,5 +1,5 @@
 from decimal import Decimal
-from menus.domain.shopping import aggregate
+from menus.domain.shopping import aggregate, reconcile_overlay
 from menus.models import ShoppingStateRecord
 from menus.application.shopping import ShoppingConflict
 from menus.application.shopping_views import ManualItemView, OverlayView, ShoppingStateView
@@ -16,20 +16,16 @@ def reconcile(menu):
     changed = False
     for overlay in state.overlays.all():
         row = generated.get((overlay.ingredient_key, overlay.family))
-        if row is None:
-            if overlay.adjusted_quantity is None:
-                overlay.delete()
-                changed = True
-            elif overlay.checked:
-                overlay.checked = False
-                overlay.save(update_fields=["checked"])
-                changed = True
+        previous = overlay.last_name, overlay.last_base_quantity, overlay.checked
+        updated = reconcile_overlay(row, previous[0], previous[1], overlay.adjusted_quantity, previous[2])
+        if updated == previous:
+            continue
+        if updated is None:
+            overlay.delete()
         else:
-            base = format(row["quantity"], ".3f") if row["quantity"] is not None else None
-            if (overlay.last_name, overlay.last_base_quantity) != (row["name"], base):
-                overlay.last_name, overlay.last_base_quantity = row["name"], base
-                overlay.save(update_fields=["last_name", "last_base_quantity"])
-                changed = True
+            overlay.last_name, overlay.last_base_quantity, overlay.checked = updated
+            overlay.save(update_fields=["last_name", "last_base_quantity", "checked"])
+        changed = True
     if changed:
         state.version += 1
         state.save(update_fields=["version"])

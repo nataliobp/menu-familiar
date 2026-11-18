@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import date, timedelta
 from unittest.mock import patch
 from uuid import uuid4
@@ -12,7 +13,8 @@ from menus.domain.recipe import recipe_content
 from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import DjangoPlanningRepository
 from menus.models import (
-    CreationReceipt, DishRecord, GeneratedOverlayRecord, MenuSlotRecord, RecipeRecord, WeeklyMenuRecord,
+    CreationReceipt, DishRecord, GeneratedOverlayRecord, ManualShoppingItemRecord, MenuSlotRecord,
+    RecipeRecord, WeeklyMenuRecord,
 )
 from menus.tests.test_planning import Clock
 
@@ -53,6 +55,8 @@ class ReviewRegressions(TestCase):
                 response = self.client.post(url, {"dish_id": self.dish.pk, "version": 1,
                                                   "preparation": "Text de prova", "action": action})
                 self.assertContains(response, "Torna al menú de la setmana", status_code=409)
+                self.assertContains(response, "Text de prova", status_code=409)
+                self.assertNotContains(response, "<form", status_code=409)
                 self.assertEqual(self.state(), before)
 
     def test_failed_recipe_save_retains_preview_intent_and_input(self):
@@ -94,16 +98,23 @@ class ReviewRegressions(TestCase):
         move_or_undo(self.repo, self.clock, self.week, 2, (0, "lunch"), (1, "lunch"))
         root = WeeklyMenuRecord.objects.get(pk=self.week)
         payload = root.undo_payload
+        boolean_schema = deepcopy(payload)
+        boolean_schema["before"][0][1]["schema_version"] = True
+        decimal_schema = deepcopy(payload)
+        decimal_schema["after"][1][1]["schema_version"] = 1.0
         corruptions = (
             {**payload, "before": payload["before"][:1]},
             {**payload, "after": payload["after"][:1]},
             {**payload, "positions": payload["positions"][:1] * 2},
             {**payload, "eligible_version": 1},
+            boolean_schema,
+            decimal_schema,
         )
         for malformed in corruptions:
             WeeklyMenuRecord.objects.filter(pk=self.week).update(undo_payload=malformed)
             before = self.state()
             self.assertEqual(self.client.get(self.url("menu_week")).status_code, 503)
+            self.assertEqual(self.client.get(self.url("shopping_week")).status_code, 503)
             self.assertEqual(self.client.post(self.url("move_action", "undo"), {"version": 3}).status_code, 503)
             self.assertEqual(self.state(), before)
 
@@ -151,9 +162,17 @@ class ReviewRegressions(TestCase):
         publication = recipe_content("Coeu-ho", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
         save_recipe(repository, self.clock, self.dish.pk, 1, publication, True)
         before = self.state()
-        with self.assertRaises(ValueError):
-            save_recipe(repository, self.clock, self.dish.pk, 2, {"preparation": "Incompleta"})
-        self.assertEqual(self.state(), before)
+        draft = recipe_content("Cuina", [{"name": "Sal", "taste": True}])
+        bad_note = deepcopy(draft)
+        bad_note["ingredients"][0]["note"] = ["Nota"]
+        for content in (
+            {"preparation": "Incompleta"}, {**draft, "preparation": ["Text"]}, bad_note,
+            {**draft, "schema_version": True}, {**draft, "schema_version": 1.0},
+        ):
+            with self.subTest(content=content):
+                with self.assertRaises(ValueError):
+                    save_recipe(repository, self.clock, self.dish.pk, 2, content)
+                self.assertEqual(self.state(), before)
 
     def test_manual_replay_after_deletion_and_invalid_reset(self):
         add = self.url("shopping_action", "manual_add")
@@ -170,10 +189,12 @@ class ReviewRegressions(TestCase):
                          {"menu_version": 2, "overlay_version": 3, "key": "invalid", "family": "invalid"}).status_code, 400)
 
     def test_move_to_same_position_and_largest_dish_identifier(self):
-        self.assertEqual(self.client.post(self.url("move_action", "move"), {
+        response = self.client.post(self.url("move_action", "move"), {
             "version": 2, "source_day": 0, "source_meal": "lunch",
             "destination_day": 0, "destination_meal": "lunch",
-        }).status_code, 302)
+        }, follow=True)
+        self.assertContains(response, "No s’ha fet cap canvi")
+        self.assertNotContains(response, "Plat mogut")
         self.assertEqual(self.repo.get(self.week).version, 2)
         largest = self.make_dish("Darrer plat", id=9223372036854775807)
         self.assertEqual(self.client.post(self.url("menu_action", 1, "lunch", "assign"),
@@ -221,3 +242,127 @@ class ReviewRegressions(TestCase):
         response = self.client.post(reverse("menu_create", args=[future]), follow=True)
         self.assertContains(response, "Menú setmanal creat")
         self.assertContains(response, 'aria-current="page"')
+
+    def test_recipe_read_failure_keeps_input_and_retry_cannot_save_or_rebase(self):
+        for contextual in (False, True):
+            with self.subTest(contextual=contextual):
+                if contextual:
+                    editor = self.url("slot_recipe_edit", 0, "lunch")
+                    publish = self.url("slot_recipe_publish", 0, "lunch")
+                else:
+                    editor = reverse("recipe_edit", args=[self.dish.pk])
+                    publish = reverse("recipe_publish", args=[self.dish.pk])
+                data = {"dish_id": self.dish.pk, "version": 1, "preparation": "Text per conservar",
+                        "name": ["Arròs", "Sal"], "quantity": ["160,5", ""], "unit": ["g", ""],
+                        "note": ["Nota", ""], "taste": ["1"], "action": "publish"}
+                before = self.state()
+                with patch("menus.web.recipes.get_dish", side_effect=OperationalError("synthetic")):
+                    failed = self.client.post(publish, data)
+                self.assertContains(failed, "Text per conservar", status_code=503)
+                self.assertContains(failed, f'action="{editor}"', status_code=503)
+                self.assertContains(failed, 'value="160,5"', status_code=503)
+                self.assertNotContains(failed, "Publica la recepta", status_code=503)
+                retried = self.client.post(editor, {**data, "action": "retry_read"})
+                self.assertContains(retried, "Text per conservar")
+                self.assertContains(retried, 'name="version" value="1"')
+                self.assertEqual(self.state(), before)
+
+        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1,
+                    recipe_content("Recepta nova", [{"name": "Sal", "taste": True}]))
+        before = self.state()
+        retried = self.client.post(editor, {**data, "action": "retry_read"})
+        self.assertContains(retried, "Revisa el valor actual", status_code=409)
+        self.assertContains(retried, 'name="version" value="1"', status_code=409)
+        self.assertEqual(self.state(), before)
+
+    def test_recipe_conflict_compares_current_taste_and_unknown_quantity(self):
+        draft = recipe_content("Cuina", [{"name": "Sal", "taste": True}, {"name": "Farina", "unit": "g"}])
+        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, draft)
+        data = {"version": 1, "preparation": "Cuina", "name": "Sal"}
+        url = reverse("recipe_draft", args=[self.dish.pk])
+        response = self.client.post(url, data)
+        self.assertContains(response, "Sal · Al gust", status_code=409)
+        self.assertContains(response, "Farina · Quantitat pendent g", status_code=409)
+
+    def test_recipe_validation_links_preparation_and_ingredient_count_errors(self):
+        publish = reverse("recipe_publish", args=[self.dish.pk])
+        before = self.state()
+        response = self.client.post(publish, {"version": 1, "name": ["Sal"] * 101})
+        self.assertContains(response, 'href="#preparation"', status_code=400)
+        self.assertContains(response, 'aria-describedby="preparation-error"', status_code=400)
+        self.assertContains(response, 'href="#ingredients-error"', status_code=400)
+        self.assertContains(response, 'id="ingredients-error"', status_code=400)
+        self.assertEqual(self.state(), before)
+
+    def test_changed_manual_receipt_requires_explicit_new_creation(self):
+        url = self.url("shopping_action", "manual_add")
+        token = str(uuid4())
+        data = {"menu_version": 2, "overlay_version": 0, "name": "Pa", "token": token}
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        changed = {**data, "name": "Pa integral"}
+        self.assertContains(self.client.post(url, changed), "Pa integral", status_code=409)
+        reviewed = self.client.post(url, {**changed, "action": "review"})
+        self.assertContains(reviewed, "Afegeix com a producte nou")
+        self.assertContains(reviewed, 'value="Pa integral"')
+        self.assertEqual(ManualShoppingItemRecord.objects.count(), 1)
+        self.assertEqual(CreationReceipt.objects.count(), 1)
+        new_token = reviewed.context["data"]["token"]
+        self.assertNotEqual(new_token, token)
+        submitted = {**changed, "overlay_version": 1, "token": new_token}
+        self.assertContains(self.client.post(url, submitted, follow=True), "Producte afegit")
+        self.assertContains(self.client.post(url, submitted, follow=True), "ja s’havia afegit")
+        self.assertEqual(ManualShoppingItemRecord.objects.count(), 2)
+        self.assertEqual(CreationReceipt.objects.count(), 2)
+
+    def test_checked_rejects_ambiguous_references_before_changing_any_item(self):
+        draft = recipe_content("Cuina", [{"name": "Sal", "taste": True}])
+        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, draft)
+        add = self.url("shopping_action", "manual_add")
+        self.assertEqual(self.client.post(add, {
+            "menu_version": 3, "overlay_version": 0, "name": "Pa", "token": str(uuid4()),
+        }).status_code, 302)
+        item = ManualShoppingItemRecord.objects.get()
+        url = self.url("shopping_action", "checked")
+        data = {"menu_version": 3, "overlay_version": 1, "checked": "1"}
+        for fields in (
+            {"id": item.id, "key": "sal", "family": "taste"},
+            {"key": "sal"},
+            {"id": [item.id, item.id]},
+        ):
+            self.assertEqual(self.client.post(url, {**data, **fields}).status_code, 400)
+        item.refresh_from_db()
+        self.assertFalse(item.checked)
+        self.assertFalse(GeneratedOverlayRecord.objects.exists())
+        self.assertEqual(self.client.post(url, {**data, "key": "sal", "family": "taste"}).status_code, 302)
+        self.assertTrue(GeneratedOverlayRecord.objects.get().checked)
+
+    def test_dish_read_failure_retains_fields_and_retry_is_read_only(self):
+        editor = reverse("dish_edit", args=[self.dish.pk])
+        data = {"name": "Nom per conservar", "primary": "eggs", "secondary": ["cereals", "vegetables"],
+                "preference": "dinner", "version": 1, "special": "on"}
+        before = self.state()
+        with patch("menus.web.catalogue.get_dish", side_effect=OperationalError("synthetic")):
+            failed = self.client.post(editor, data)
+        self.assertContains(failed, 'value="Nom per conservar"', status_code=503)
+        self.assertContains(failed, 'name="secondary" value="vegetables"', status_code=503)
+        self.assertContains(failed, 'value="retry_read"', status_code=503)
+        retried = self.client.post(editor, {**data, "action": "retry_read"})
+        self.assertContains(retried, 'value="Nom per conservar"')
+        self.assertContains(retried, 'value="cereals" checked')
+        self.assertContains(retried, 'value="vegetables" checked')
+        self.assertEqual(self.state(), before)
+
+    def test_changed_dish_receipt_can_be_reviewed_without_writing(self):
+        url = reverse("dish_create")
+        data = {"name": "Primer plat", "primary": "cereals", "preference": "both", "token": str(uuid4())}
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        changed = {**data, "name": "Segon plat"}
+        self.assertContains(self.client.post(url, changed), "Segon plat", status_code=409)
+        reviewed = self.client.post(url, {**changed, "action": "review"})
+        self.assertContains(reviewed, "Crea un plat nou")
+        self.assertFalse(DishRecord.objects.filter(name="Segon plat").exists())
+        new_token = reviewed.context["values"]["token"]
+        self.assertNotEqual(new_token, data["token"])
+        confirmed = self.client.post(url, {**changed, "token": new_token})
+        self.assertEqual(confirmed.status_code, 302)
+        self.assertEqual(DishRecord.objects.filter(name="Segon plat").count(), 1)

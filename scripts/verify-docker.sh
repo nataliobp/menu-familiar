@@ -181,7 +181,22 @@ with_database "$tag" python manage.py migrate --check
 with_database "$tag" python manage.py shell -c \
     'from menus.models import DishRecord; DishRecord.objects.create(name="Plat sintètic Docker", primary_category_id="cereals", meal_preference="both", special_occasion=False)'
 
-printf '\n== Test Gunicorn and persisted data from inside the container ==\n'
+printf '\n== Verify a matching SQLite backup and restore ==\n'
+with_database "$tag" python - <<'PYBACKUP'
+import os
+import sqlite3
+
+with sqlite3.connect(os.environ["DJANGO_DB_PATH"]) as source, sqlite3.connect("/data/restored.sqlite3") as restored:
+    source.backup(restored)
+    assert restored.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    assert list(restored.iterdump()) == list(source.iterdump())
+print("Synthetic backup restored with identical schema and data.")
+PYBACKUP
+
+DJANGO_DB_PATH=/data/restored.sqlite3
+with_database "$tag" python manage.py migrate --check
+
+printf '\n== Test Gunicorn against the restored database from inside the container ==\n'
 app=$(docker_cmd run --detach --name "$run_id-app" --network none \
     --mount "type=volume,src=$volume,dst=/data" \
     -e "DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY" -e "DJANGO_ALLOWED_HOSTS=$DJANGO_ALLOWED_HOSTS" \
@@ -224,7 +239,7 @@ print(f"Gunicorn health check passed after {attempts} attempt(s).", flush=True)
 assert request("/menu/")[0] == 200, "Menu unavailable"
 assert request("/static/menus/app.css")[0] == 200, "Collected stylesheet unavailable"
 status, body = request("/plats/")
-assert status == 200 and "Plat sintètic Docker".encode() in body, "Seed not visible through the reused volume"
+assert status == 200 and "Plat sintètic Docker".encode() in body, "Seed not visible in the restored database"
 assert request("/menu/", headers={"Host": "invalid.example"})[0] == 400, "Host validation failed"
 assert request("/plantilla/0/lunch/", data=b"category=cereals")[0] == 403, "CSRF validation failed"
 print("Health, menu, persisted seed, static assets, Host validation and CSRF verified.")
@@ -233,21 +248,6 @@ then
     docker_cmd logs "$app"
     exit 1
 fi
-
-printf '\n== Verify a matching SQLite backup and restore ==\n'
-with_database "$tag" python - <<'PYBACKUP'
-import os
-import sqlite3
-
-with sqlite3.connect(os.environ["DJANGO_DB_PATH"]) as source, sqlite3.connect("/data/restored.sqlite3") as restored:
-    source.backup(restored)
-    assert restored.execute("PRAGMA integrity_check").fetchone() == ("ok",)
-    assert restored.execute("SELECT COUNT(*) FROM menus_dishrecord").fetchone() == (1,)
-    assert restored.execute("SELECT COUNT(*) FROM django_migrations").fetchone() == source.execute(
-        "SELECT COUNT(*) FROM django_migrations"
-    ).fetchone()
-print("Synthetic backup restored with its schema and seed.")
-PYBACKUP
 
 if "$keep_image"; then
     candidate="menu-familiar:verified-$ref"

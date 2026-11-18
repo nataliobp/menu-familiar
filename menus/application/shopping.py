@@ -5,12 +5,32 @@ from uuid import UUID
 
 from menus.application.planning import PastWeek, Rollover
 from menus.domain.planning import monday
-from menus.domain.shopping import manual_item
+from menus.domain.shopping import ORDER, manual_item
 from menus.application.dishes import DuplicateReceipt
 
 
 class ShoppingConflict(Exception):
     pass
+
+
+class ShoppingReceiptConflict(ShoppingConflict):
+    pass
+
+
+def check_action(action, data):
+    if action not in {"checked", "manual_check", "check"}:
+        return action
+    item_id, key, family = data.get("id"), data.get("key"), data.get("family")
+    if item_id not in (None, ""):
+        identifier = str(item_id)
+        if (action == "check" or key not in (None, "") or family not in (None, "")
+                or not identifier.isascii() or not identifier.isdecimal()
+                or len(identifier) > 19 or not 1 <= int(identifier) <= 9223372036854775807):
+            raise ValueError("Invalid manual item reference")
+        return "manual_check"
+    if action == "manual_check" or not isinstance(key, str) or not key or not isinstance(family, str) or family not in ORDER:
+        raise ValueError("Invalid generated item reference")
+    return "check"
 
 
 def _manual_creation(week, data):
@@ -27,8 +47,17 @@ def _replay(repo, week, token, digest):
         return None
     operation, scope, recorded_digest, item_id = receipt
     if (operation, scope, recorded_digest) != ("manual_add", week.isoformat(), digest):
-        raise ShoppingConflict()
+        raise ShoppingReceiptConflict()
     return item_id
+
+
+def review_manual_creation(repo, week, data):
+    token, digest, _ = _manual_creation(week, data)
+    try:
+        _replay(repo, week, token, digest)
+    except ShoppingReceiptConflict:
+        return False
+    return True
 
 
 @dataclass(frozen=True)
@@ -39,6 +68,7 @@ class ManualCreation:
 
 
 def mutate_shopping(repo, clock, week, menu_version, overlay_version, action, data, *, receipt=False):
+    action = check_action(action, data)
     if action == "manual_add":
         token, digest, values = _manual_creation(week, data)
         data = {**data, "receipt_token": token, "digest": digest, "values": values}

@@ -213,8 +213,11 @@ def move_action(request, week, action):
         if action in ("move", "exchange"):
             source = (int(request.POST.get("source_day", "")), request.POST.get("source_meal"))
             destination = (int(request.POST.get("destination_day", "")), request.POST.get("destination_meal"))
-        move_or_undo(DjangoPlanningRepository(), MadridClock(), week, version, source, destination, request.POST.get("confirm") == "yes", action)
-        messages.success(request, {"move": "Plat mogut", "exchange": "Plats intercanviats", "undo": "Canvi desfet"}[action])
+        menu = move_or_undo(DjangoPlanningRepository(), MadridClock(), week, version, source, destination, request.POST.get("confirm") == "yes", action)
+        if menu.version == version:
+            messages.info(request, "No s’ha fet cap canvi")
+        else:
+            messages.success(request, {"move": "Plat mogut", "exchange": "Plats intercanviats", "undo": "Canvi desfet"}[action])
         return redirect("menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)

@@ -6,7 +6,10 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
 from menus.application.catalogue_queries import browse_dishes, get_dish
-from menus.application.dishes import DishConflict, create_dish, set_archived, update_dish
+from menus.application.dishes import (
+    DishConflict, DishReceiptConflict, create_dish, review_dish_creation, set_archived, update_dish,
+)
+from menus.application.errors import DataIntegrityError
 from menus.application.planning import Rollover
 from menus.domain.dish_edit import DishInput
 from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
@@ -53,40 +56,70 @@ def dish_detail(request, dish_id):
 
 @require_http_methods(["GET", "POST"])
 def dish_edit(request, dish_id=None):
-    with transaction.atomic():
-        dish = get_dish(DjangoCatalogueQueries(), dish_id) if dish_id is not None else None
-        if dish_id is not None and dish is None:
-            raise Http404()
-        categories = DjangoTemplateRepository().categories()
-    initial = {"name": dish.name, "primary": dish.primary_category_id,
-               "secondary": list(dish.secondary_categories),
-               "preference": dish.meal_preference, "special": dish.special_occasion,
-               "version": dish.version} if dish else {"preference": "both", "secondary": [], "token": str(uuid4())}
-    values, error, status = initial, None, 200
-    if request.method == "POST":
+    submitted = request.method == "POST"
+    values = None
+    if submitted:
         values = {"name": request.POST.get("name", ""), "primary": request.POST.get("primary", ""),
                   "secondary": request.POST.getlist("secondary"), "preference": request.POST.get("preference", ""),
                   "special": request.POST.get("special") == "on", "version": request.POST.get("version", ""),
                   "token": request.POST.get("token", "")}
+    try:
+        with transaction.atomic():
+            dish = get_dish(DjangoCatalogueQueries(), dish_id) if dish_id is not None else None
+            if dish_id is not None and dish is None:
+                raise Http404()
+            categories = DjangoTemplateRepository().categories()
+    except (DatabaseError, DataIntegrityError):
+        if not submitted:
+            return unavailable()
+        return render(request, "menus/dish_edit.html", {
+            "editing": dish_id is not None, "values": values, "retry_read": True,
+            "error": "No s’han pogut llegir les dades. Torna a obrir el formulari per continuar."
+        }, status=503)
+    except Http404:
+        if not submitted:
+            raise
+        return render(request, "menus/dish_edit.html", {
+            "editing": True, "values": values, "target_unavailable": True,
+            "error": "Aquest plat ja no està disponible.",
+        }, status=404)
+    error, status, reviewed, new_creation = None, 200, False, False
+    if not submitted:
+        values = {"name": dish.name, "primary": dish.primary_category_id,
+                  "secondary": list(dish.secondary_categories),
+                  "preference": dish.meal_preference, "special": dish.special_occasion,
+                  "version": dish.version} if dish else {"preference": "both", "secondary": [], "token": str(uuid4())}
+    else:
         try:
-            if dish and request.POST.get("action") == "review":
+            action = request.POST.get("action")
+            if action == "retry_read":
+                if dish and values["version"] != str(dish.version):
+                    raise DishConflict()
+            elif action == "review" and dish:
                 values["version"] = dish.version
-                return render(request, "menus/dish_edit.html", {
-                    "dish": dish, "categories": categories.items(), "values": values,
-                    "reviewed": True,
-                })
-            if len(values["secondary"]) != len(set(values["secondary"])):
-                raise ValueError()
-            data = DishInput(values["name"], values["primary"], frozenset(values["secondary"]), values["preference"], values["special"])
-            repo = DjangoDishRepository()
-            if dish:
-                update_dish(repo, MadridClock(), dish.pk, data, int(values["version"]))
-                result_id = dish.pk
+                reviewed = True
             else:
-                result_id = create_dish(repo, data, values["token"])
-            return redirect("dish_detail", dish_id=result_id)
+                if len(values["secondary"]) != len(set(values["secondary"])):
+                    raise ValueError()
+                data = DishInput(values["name"], values["primary"], frozenset(values["secondary"]), values["preference"], values["special"])
+                repo = DjangoDishRepository()
+                if action == "review":
+                    reviewed = True
+                    new_creation = not review_dish_creation(repo, data, values["token"])
+                    if new_creation:
+                        values["token"] = str(uuid4())
+                        error = "La sol·licitud anterior ja es va fer servir amb altres dades. Revisa les dades abans de crear un plat nou."
+                else:
+                    if dish:
+                        update_dish(repo, MadridClock(), dish.pk, data, int(values["version"]))
+                        result_id = dish.pk
+                    else:
+                        result_id = create_dish(repo, data, values["token"])
+                    return redirect("dish_detail", dish_id=result_id)
         except (ValueError, TypeError):
             error, status = "Revisa les dades del plat.", 400
+        except DishReceiptConflict:
+            error, status = "La sol·licitud ja es va fer servir amb altres dades. Revisa les dades abans de continuar.", 409
         except DishConflict:
             error, status = "El contingut ha canviat. Revisa les dades abans de tornar-ho a provar.", 409
         except (DatabaseError, Rollover):
@@ -104,7 +137,7 @@ def dish_edit(request, dish_id=None):
             field_errors["preference"] = "Selecciona un àpat preferent vàlid."
     return render(request, "menus/dish_edit.html", {
         "dish": dish, "categories": categories.items(), "values": values, "error": error,
-        "conflict": status == 409, "field_errors": field_errors,
+        "conflict": status == 409, "field_errors": field_errors, "reviewed": reviewed, "new_creation": new_creation,
     }, status=status)
 
 

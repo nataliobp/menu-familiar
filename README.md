@@ -36,6 +36,8 @@ The test runner removes its test database. Without `DJANGO_TEST_DB_PATH`, these 
 
 The previous isolated Docker verification passed for commit `3782a0edd7c69c7adee77bb4cc5ac31294e471df`. Verify the candidate commit and record its image ID before using it. Set an independent `DJANGO_SECRET_KEY`, comma-separated `DJANGO_ALLOWED_HOSTS`, an absolute private data directory in `MENU_DATA_DIR`, and an explicit trusted interface and port in `MENU_BIND_ADDRESS` and `MENU_PORT`; `.env.example` contains placeholders. Production requires an absolute `DJANGO_DB_PATH` and debug defaults off. The data directory must be writable by container UID 10001. Run migrations as a one-off before starting the app. `/healthz` reports database reachability without exposing data.
 
+Gunicorn is pinned to [upstream's latest stable release, 27.0.1](https://github.com/benoitc/gunicorn/releases/tag/27.0.1), as checked on 18 November 2026. Its unused control socket is disabled in the image. The isolated Docker verification checks the restored database with the candidate image before tagging it.
+
 Use an allowlisted build context staged outside the source directory, containing only `Dockerfile`, `requirements.txt`, `manage.py`, `config/`, and the required Python, template and static files under `menus/`. Verify its contents before building; exclude private databases, CSV files, secrets, backups and logs. Do not bind to a public interface. Actual IPv4 and IPv6 isolation, guest-network denial, router forwards and any tunnels must be checked by the owner before release. No production deployment or unrelated service changes are authorized by this document.
 
 ## Isolated Docker verification
@@ -86,13 +88,13 @@ For an owner-authorized release, verify the candidate from its committed source 
 
 ```sh
 export MENU_IMAGE='menu-familiar:verified-REPLACE_WITH_VERIFIED_COMMIT'
-docker compose --env-file /absolute/path/to/private-menu.env config --quiet
-docker compose --env-file /absolute/path/to/private-menu.env stop menu-familiar
-docker compose --env-file /absolute/path/to/private-menu.env run --rm --no-deps menu-familiar python manage.py migrate --noinput
+docker compose --env-file /absolute/path/to/private-menu.env config --quiet &&
+docker compose --env-file /absolute/path/to/private-menu.env stop menu-familiar &&
+docker compose --env-file /absolute/path/to/private-menu.env run --rm --no-deps menu-familiar python manage.py migrate --noinput &&
 docker compose --env-file /absolute/path/to/private-menu.env up -d --no-build menu-familiar
 ```
 
-Replace the example tag with the verified tag. For rollback, stop only `menu-familiar`, keep the failed candidate database for investigation, and restore the matching backup into a new private data directory. Verify the copy with `PRAGMA integrity_check` and the previous image with `python manage.py migrate --check`. Set `MENU_IMAGE` and `MENU_DATA_DIR` to the matched pair, then use the same `up -d --no-build` command and check `/healthz`. The owner must verify actual trusted and untrusted IPv4 and IPv6 access separately.
+Replace the example tag with the verified tag. If migration fails, review the error and follow the rollback steps before starting the service. For rollback, stop only `menu-familiar`, keep the failed candidate database for investigation, and restore the matching backup into a new private data directory. Verify the copy with `PRAGMA integrity_check` and the previous image with `python manage.py migrate --check`. Set `MENU_IMAGE` and `MENU_DATA_DIR` to the matched pair, then use the same `up -d --no-build` command and check `/healthz`. The owner must verify actual trusted and untrusted IPv4 and IPv6 access separately.
 
 ## Consolidated manual owner QA (pending)
 

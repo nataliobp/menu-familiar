@@ -1,5 +1,6 @@
 from django.db import IntegrityError, transaction
 from menus.application.dishes import DishConflict, DuplicateReceipt
+from menus.domain.recipe import effective_recipe, recipe_transition
 from menus.infrastructure.django_planning import DjangoPlanningRepository
 from menus.models import CreationReceipt, DishRecord, SecondaryCategoryRecord, WeeklyMenuRecord
 
@@ -85,12 +86,10 @@ class DjangoDishRepository:
             raise DishConflict()
         recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
         draft, published = (recipe.draft, recipe.published) if recipe else (None, None)
-        old_effective = ("published", published) if published is not None else ("draft", draft) if draft is not None else ("missing", None)
-        new_draft, new_published = (None, content) if publish else (content, published)
+        new_draft, new_published = recipe_transition(published, content, publish)
         changed = (draft, published) != (new_draft, new_published)
         if not DishRecord.objects.filter(pk=dish_id, version=version).update(version=version + int(changed)):
             raise DishConflict()
         if changed:
             RecipeRecord.objects.update_or_create(dish_id=dish_id, defaults={"draft": new_draft, "published": new_published})
-        new_effective = ("published", new_published) if new_published is not None else ("draft", new_draft)
-        return old_effective != new_effective
+        return effective_recipe(draft, published) != effective_recipe(new_draft, new_published)

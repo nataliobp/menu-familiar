@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from menus.application.planning import DuplicateWeek, PlanningConflict
 from menus.application.errors import DataIntegrityError
 from menus.domain.planning import Slot, WeeklyMenu, validate_snapshot
+from menus.domain.recipe import effective_recipe
 from menus.infrastructure.django_template import DjangoTemplateRepository
 from menus.models import DishRecord, MenuSlotRecord, WeeklyMenuRecord, RecipeRecord
 
@@ -75,8 +76,7 @@ class DjangoPlanningRepository:
         if dish is None:
             return None
         recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
-        effective = (recipe.published or recipe.draft) if recipe else None
-        status = "published" if recipe and recipe.published is not None else "draft" if recipe and recipe.draft is not None else "missing"
+        status, effective = effective_recipe(recipe.draft, recipe.published) if recipe else ("missing", None)
         snapshot = {"schema_version": 1, "dish_id": dish.pk, "name": dish.name,
                 "primary_category": {"key": dish.primary_category_id, "name": dish.primary_category.name_ca},
                 "secondary_categories": [{"key": key, "name": name} for key, name in dish.secondary_categories.order_by("category_id").values_list("category_id", "category__name_ca")],

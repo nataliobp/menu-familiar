@@ -155,7 +155,9 @@ class WeeklyMenu:
 
 def validate_snapshot(value, dish_id):
     from menus.domain.recipe import validate_content
-    if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("dish_id") != dish_id:
+    if (not isinstance(value, dict) or type(value.get("schema_version")) is not int
+            or value["schema_version"] != 1 or type(value.get("dish_id")) is not int
+            or value["dish_id"] != dish_id):
         raise ValueError("Invalid dish snapshot")
     required = {"schema_version", "dish_id", "name", "primary_category", "secondary_categories", "meal_preference", "special_occasion", "recipe_status", "recipe_content"}
     if set(value) != required or not isinstance(value["name"], str) or not value["name"].strip():

@@ -6,8 +6,11 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
+from menus.application.errors import DataIntegrityError
 from menus.application.planning import PastWeek, Rollover
-from menus.application.shopping import ShoppingConflict, get_shopping, mutate_shopping
+from menus.application.shopping import (
+    ShoppingConflict, ShoppingReceiptConflict, check_action, get_shopping, mutate_shopping, review_manual_creation,
+)
 from menus.domain.planning import monday
 from menus.infrastructure.django_planning import MadridClock
 from menus.infrastructure.django_shopping import DjangoShoppingRepository
@@ -37,17 +40,24 @@ def shopping_view(request, week):
 @require_POST
 def shopping_action(request, week, action):
     week = parse_week(week)
-    if action == "checked":
-        action = "manual_check" if request.POST.get("id") else "check"
-    if action not in ("manual_add", "manual_edit", "manual_remove", "manual_check", "adjust", "reset", "check"):
+    if action not in ("manual_add", "manual_edit", "manual_remove", "manual_check", "adjust", "reset", "check", "checked"):
         raise Http404()
+    data = {key: request.POST.get(key, "") for key in ("name", "quantity", "unit", "token", "id", "key", "family", "checked")}
+    repo = DjangoShoppingRepository()
     try:
-        data = {key: request.POST.get(key, "") for key in ("name", "quantity", "unit", "token", "id", "key", "family", "checked")}
+        if action in {"checked", "manual_check", "check"} and any(
+            len(request.POST.getlist(field)) > 1 for field in ("id", "key", "family", "checked")
+        ):
+            raise ValueError("Duplicate check input")
+        action = check_action(action, data)
         if request.POST.get("action") == "review":
             with transaction.atomic():
-                current_view = get_shopping(DjangoShoppingRepository(), week)
-            if not current_view or week < monday(MadridClock().today()):
-                raise PastWeek()
+                current_view = get_shopping(repo, week)
+                if not current_view or week < monday(MadridClock().today()):
+                    raise PastWeek()
+                new_creation = action == "manual_add" and not review_manual_creation(repo, week, data)
+            if new_creation:
+                data["token"] = str(uuid4())
             menu, state, rows, _, _, orphans = current_view
             manual = state.manual_items if state else ()
             target_missing = (
@@ -63,14 +73,18 @@ def shopping_action(request, week, action):
             )
             return render(request, "menus/shopping_error.html", {
                 "week": week, "action": action, "data": data, "reviewed": True,
+                "new_creation": new_creation,
                 "current_rows": rows, "current_manual": manual, "target_missing": target_missing,
                 "orphans": orphans, "menu_version": menu.version,
                 "overlay_version": state.version if state else 0,
-                "error": "Compara les dades i confirma el canvi que vols fer.",
+                "error": (
+                    "La sol·licitud anterior ja es va fer servir amb altres dades. Comprova la llista abans d’afegir un producte nou."
+                    if new_creation else "Compara les dades i confirma el canvi que vols fer."
+                ),
             })
         if action == "manual_remove" and request.POST.get("confirm") != "yes":
             with transaction.atomic():
-                view = get_shopping(DjangoShoppingRepository(), week)
+                view = get_shopping(repo, week)
                 if view is None or not view[1]:
                     raise ValueError("Missing item")
                 if view[0].version != int(request.POST.get("menu_version", "")) or view[1].version != int(request.POST.get("overlay_version", "")):
@@ -82,7 +96,7 @@ def shopping_action(request, week, action):
                     raise PastWeek()
                 return render(request, "menus/manual_confirm.html", {"week": week, "item": item, "menu_version": view[0].version, "overlay_version": view[1].version})
         result = mutate_shopping(
-            DjangoShoppingRepository(), MadridClock(), week,
+            repo, MadridClock(), week,
             int(request.POST.get("menu_version", "")), int(request.POST.get("overlay_version", "")),
             action, data, receipt=True,
         )
@@ -96,24 +110,31 @@ def shopping_action(request, week, action):
         return redirect("shopping_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
-    except ShoppingConflict:
+    except ShoppingConflict as conflict:
         try:
             with transaction.atomic():
-                current_view = get_shopping(DjangoShoppingRepository(), week)
+                current_view = get_shopping(repo, week)
                 current_rows = current_view[2] if current_view else []
                 current_manual = list(current_view[1].manual_items) if current_view and current_view[1] else []
-        except (DatabaseError, ValueError):
-            return unavailable()
+        except (DatabaseError, DataIntegrityError, ValueError):
+            return render(request, "menus/shopping_error.html", {
+                "week": week, "action": action, "data": data, "conflict": True,
+                "error": "No s’ha pogut llegir la llista actual. Torna-ho a provar per revisar el canvi.",
+            }, status=503)
+        error = ("La sol·licitud ja es va fer servir amb altres dades. Revisa la llista abans de continuar."
+                 if isinstance(conflict, ShoppingReceiptConflict) else
+                 "El contingut ha canviat. Revisa les dades abans de tornar-ho a provar.")
         return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
-                      "error": "El contingut ha canviat. Revisa les dades abans de tornar-ho a provar.", "conflict": True,
+                      "error": error, "conflict": True,
                       "current_rows": current_rows, "current_manual": current_manual, "orphans": current_view[-1] if current_view else ()}, status=409)
     except (ValueError, TypeError, KeyError):
         return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
                       "error": "Revisa les dades del producte.", "menu_version": request.POST.get("menu_version", ""),
                       "overlay_version": request.POST.get("overlay_version", "")}, status=400)
-    except (DatabaseError, Rollover):
+    except (DatabaseError, DataIntegrityError, Rollover):
         return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
                       "error": "No s’ha pogut completar l’acció. Revisa la llista abans de tornar-ho a provar.",
+                      "conflict": request.POST.get("action") == "review",
                       "menu_version": request.POST.get("menu_version", ""),
                       "overlay_version": request.POST.get("overlay_version", "")}, status=503)
 

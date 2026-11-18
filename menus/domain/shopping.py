@@ -73,6 +73,14 @@ def manual_item(name, quantity, unit):
         raise ValueError("Invalid manual item")
     return name, parse_amount(quantity) if quantity else None, unit or None
 
+
+def reconcile_overlay(row, name, base, adjustment, checked):
+    if row is None:
+        return (name, base, False) if adjustment is not None else None
+    amount = row["quantity"]
+    return row["name"], format(amount, ".3f") if amount is not None else None, checked
+
+
 def overlay_transition(action, data, row, previous):
     """Return the adjustment and check state to keep, or None to remove it."""
     adjustment, checked = previous or (None, False)
