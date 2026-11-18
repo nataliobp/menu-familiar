@@ -77,3 +77,85 @@ class PlanningTests(TestCase):
             create_menu(self.repo, self.clock, self.week)
             self.assertEqual(self.client.get(reverse("recipe_edit", args=[self.dish.pk])).status_code, 200)
             self.assertEqual(self.client.get(reverse("shopping_week", args=[self.week.isoformat()])).status_code, 200)
+
+    def test_skipped_move_requires_confirmation_and_undo_restores_skip(self):
+        from menus.application.planning import move_or_undo
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        change_menu(self.repo, self.clock, self.week, (1, "lunch"), 2, "skip")
+        with self.assertRaises(ValueError):
+            move_or_undo(self.repo, self.clock, self.week, 3, (0, "lunch"), (1, "lunch"))
+        move_or_undo(self.repo, self.clock, self.week, 3, (0, "lunch"), (1, "lunch"), True)
+        move_or_undo(self.repo, self.clock, self.week, 4)
+        menu = self.repo.get(self.week)
+        self.assertEqual(menu.slots[(0, "lunch")].state, "selected")
+        self.assertEqual(menu.slots[(1, "lunch")].state, "skipped")
+
+    def test_direct_historical_write_refused(self):
+        create_menu(self.repo, self.clock, self.week)
+        with self.assertRaises(PastWeek):
+            change_menu(self.repo, Clock(self.week + timedelta(days=7)), self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "pending")
+
+    def test_remove_requires_confirmation_and_get_is_read_only(self):
+        from unittest.mock import patch
+        from django.urls import reverse
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        url = reverse("confirm_remove", args=[self.week.isoformat(), 0, "lunch"])
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            self.assertEqual(self.client.get(url).status_code, 200)
+            self.assertEqual(self.client.post(url, {"version": 2}).status_code, 200)
+            self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "selected")
+            self.assertEqual(self.client.post(url, {"version": 2, "confirm": "yes"}).status_code, 302)
+            self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "pending")
+
+    def test_corrupt_snapshot_is_unavailable_not_silently_repaired(self):
+        from django.urls import reverse
+        from menus.models import MenuSlotRecord
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        record = MenuSlotRecord.objects.get(weekly_menu_id=self.week, day_index=0, meal="lunch")
+        record.dish_snapshot["schema_version"] = 999
+        record.save(update_fields=["dish_snapshot"])
+        response = self.client.get(reverse("menu_week", args=[self.week.isoformat()]))
+        self.assertEqual(response.status_code, 503)
+        record.refresh_from_db()
+        self.assertEqual(record.dish_snapshot["schema_version"], 999)
+
+    def test_shopping_invalid_input_is_preserved(self):
+        from unittest.mock import patch
+        from uuid import uuid4
+        from django.urls import reverse
+        create_menu(self.repo, self.clock, self.week)
+        url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            response = self.client.post(url, {"menu_version": 1, "overlay_version": 0, "token": str(uuid4()), "name": "Producte sintètic", "quantity": "abc", "unit": "g"})
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Producte sintètic", status_code=400)
+        self.assertContains(response, "abc", status_code=400)
+
+    def test_recipe_publication_through_web_and_shopping_projection(self):
+        from unittest.mock import patch
+        from django.urls import reverse
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            create_menu(self.repo, self.clock, self.week)
+            change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+            response = self.client.post(reverse("recipe_publish", args=[self.dish.pk]), {"version": 1, "preparation": "Coeu-ho", "name": ["Arròs"], "quantity": ["160"], "unit": ["g"], "note": [""]})
+            self.assertEqual(response.status_code, 302)
+            response = self.client.get(reverse("shopping_week", args=[self.week.isoformat()]))
+            self.assertContains(response, "Arròs")
+            self.assertContains(response, "160,000")
+
+    def test_recipe_discard_review_preserves_unsaved_values(self):
+        from django.urls import reverse
+        url = reverse("recipe_edit", args=[self.dish.pk])
+        payload = {"version": 1, "preparation": "Text encara no desat", "name": ["Ingredient"], "quantity": ["12"], "unit": ["g"], "note": [""], "action": "review_discard"}
+        response = self.client.post(url, payload)
+        self.assertContains(response, "Descarta els canvis?")
+        payload["action"] = "continue"
+        response = self.client.post(url, payload)
+        self.assertContains(response, "Text encara no desat")
+        self.assertContains(response, "Ingredient")
+        from menus.models import RecipeRecord
+        self.assertFalse(RecipeRecord.objects.exists())

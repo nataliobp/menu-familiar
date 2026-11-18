@@ -1,2 +1,23 @@
 :root { font-family: system-ui, sans-serif; color: #243b30; background: #f8f7ef; }
 * { box-sizing: border-box; } body { margin: 0; } header { display: flex; justify-content: space-between; padding: 1rem; background: #e4eddf; } main { max-width: 1100px; margin: auto; padding: 1rem; } a { color: #205d40; } .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .5rem; } h2 { font-size: 1rem; } .slot { display: flex; flex-direction: column; min-height: 5rem; padding: .6rem; margin-bottom: .5rem; border: 1px solid #b8cbb9; border-radius: .5rem; background: white; text-decoration: none; overflow-wrap: anywhere; } button, select { font: inherit; padding: .7rem; margin: .8rem 0; } label { display: block; } :focus-visible { outline: 3px solid #b26a20; outline-offset: 2px; } @media (max-width: 700px) { .week { grid-template-columns: 1fr; } .week section { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; } .week h2 { grid-column: 1 / -1; margin-bottom: 0; } }
+@media (min-width: 701px) {
+  body { display: flex; min-height: 100vh; }
+  header { width: 150px; flex: 0 0 150px; display: block; }
+  header nav { display: grid; gap: .7rem; margin-top: 1.2rem; }
+  main { flex: 1; min-width: 0; }
+}
+:root { color: #203b30; background: #fbfaf6; }
+header { background: #edf2e9; border-color: #d9e1d7; }
+header nav a { display: inline-block; padding: .65rem .45rem; border-radius: .5rem; text-decoration: none; font-weight: 600; }
+header nav a:hover { background: #d7e7d8; }
+h1 { font-size: clamp(1.45rem, 3vw, 1.9rem); letter-spacing: -.035em; }
+h2 { letter-spacing: -.02em; }
+.week h2 { background: #e8eee5; border-radius: .5rem; padding: .5rem; text-align: center; }
+.slot { border-color: #d9e1d7; gap: .35rem; }
+.slot span { color: #9b6444; font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+button, input:not([type="checkbox"]), select, textarea { border: 1px solid #bdcbbf; border-radius: .55rem; background: white; color: inherit; font: inherit; padding: .65rem; }
+button { min-height: 42px; cursor: pointer; font-weight: 600; }
+button:hover { background: #e8f0e7; }
+textarea { width: min(100%, 48rem); min-height: 8rem; }
+fieldset { border: 1px solid #d9e1d7; border-radius: .7rem; margin: .7rem 0; }
+input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: #28664e; }

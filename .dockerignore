@@ -5,8 +5,10 @@
 !config/
 !config/*.py
 !menus/
+!menus/**/
 !menus/**/*.py
 !menus/templates/
 !menus/templates/**
 !menus/static/
 !menus/static/**
+menus/tests/

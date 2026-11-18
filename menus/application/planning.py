@@ -77,7 +77,7 @@ def change_menu(repo, clock, week, position, version, operation, dish_id=None, c
         return menu
 
 
-def move_or_undo(repo, clock, week, version, source=None, destination=None, confirmed=False):
+def move_or_undo(repo, clock, week, version, source=None, destination=None, confirmed=False, operation=None):
     with repo.atomic():
         current = monday(clock.today())
         if week < current:
@@ -87,6 +87,10 @@ def move_or_undo(repo, clock, week, version, source=None, destination=None, conf
             raise ValueError("Missing menu")
         if menu.version != version:
             raise PlanningConflict()
+        if source is not None and operation in ("move", "exchange"):
+            target_selected = menu.slots[destination].state == "selected"
+            if target_selected != (operation == "exchange"):
+                raise ValueError("Invalid destination")
         changed = menu.undo_change() if source is None else menu.move_or_exchange(source, destination, confirmed)
         if changed:
             repo.save(menu, version)

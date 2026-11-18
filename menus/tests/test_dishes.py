@@ -101,3 +101,51 @@ class DishTests(TestCase):
         from menus.models import DishRecord
         self.assertEqual(DishRecord.objects.get(pk=dish_id).name, "Plat")
         self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["name"], "Plat")
+
+    def test_matching_check_and_override_survive_refresh_then_orphan_return(self):
+        from menus.application.recipes import save_recipe
+        from menus.application.shopping import mutate_shopping
+        from menus.domain.recipe import recipe_content
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        dishes, plans, shopping = DjangoDishRepository(), DjangoPlanningRepository(), DjangoShoppingRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat A", "cereals", frozenset(), "both", False), uuid4())
+        first = recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
+        save_recipe(dishes, Clock(week), dish_id, 1, first, True)
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        key = {"key": "arròs", "family": "g"}
+        mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {**key, "quantity": "200"})
+        mutate_shopping(shopping, Clock(week), week, 2, 1, "check", {**key, "checked": "1"})
+        second = recipe_content("Cou", [{"name": "Arròs", "quantity": "180", "unit": "g"}], True)
+        save_recipe(dishes, Clock(week), dish_id, 2, second, True)
+        menu, state, rows, *_ = shopping.read(week)
+        self.assertEqual(str(rows[0]["quantity"]), "180.000")
+        self.assertTrue(rows[0]["overlay"].checked)
+        self.assertEqual(rows[0]["overlay"].adjusted_quantity, "200.000")
+        change_menu(plans, Clock(week), week, (0, "lunch"), menu.version, "remove")
+        menu, state, rows, _, _, orphans = shopping.read(week)
+        self.assertFalse(orphans[0].checked)
+        change_menu(plans, Clock(week), week, (0, "lunch"), menu.version, "assign", dish_id)
+        row = shopping.read(week)[2][0]
+        self.assertEqual(row["overlay"].adjusted_quantity, "200.000")
+        self.assertFalse(row["overlay"].checked)
+
+    def test_contextual_recipe_write_rejects_changed_slot_and_rollover(self):
+        from menus.application.planning import PlanningConflict, Rollover
+        from menus.application.recipes import save_recipe
+        from menus.domain.recipe import recipe_content
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat A", "cereals", frozenset(), "both", False), uuid4())
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 2, "remove")
+        content = recipe_content("", [])
+        with self.assertRaises(PlanningConflict):
+            save_recipe(dishes, Clock(week), dish_id, 1, content, context=(week, (0, "lunch")))
+        with self.assertRaises(Rollover):
+            save_recipe(dishes, Clock(week, week + timedelta(days=7)), dish_id, 1, content)
+        from menus.models import RecipeRecord, DishRecord
+        self.assertFalse(RecipeRecord.objects.filter(dish_id=dish_id).exists())
+        self.assertEqual(DishRecord.objects.get(pk=dish_id).version, 1)

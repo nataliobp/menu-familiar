@@ -2,7 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from django.db import IntegrityError, transaction
 from menus.application.planning import DuplicateWeek, PlanningConflict
-from menus.domain.planning import Slot, WeeklyMenu
+from menus.domain.planning import Slot, WeeklyMenu, validate_snapshot
 from menus.infrastructure.django_template import DjangoTemplateRepository
 from menus.models import DishRecord, MenuSlotRecord, WeeklyMenuRecord, RecipeRecord
 
@@ -24,11 +24,13 @@ class DjangoPlanningRepository:
         root = WeeklyMenuRecord.objects.filter(pk=week).first()
         if root is None:
             return None
+        if root.shopping_projection_version != 1:
+            raise ValueError("Unsupported shopping projection")
         slots = {}
         for row in root.slots.all():
             suggestion = (row.suggested_category_key, row.suggested_category_name) if row.suggested_category_key else None
-            if row.dish_snapshot is not None and (row.dish_snapshot.get("schema_version") != 1 or row.dish_snapshot.get("dish_id") != row.dish_id):
-                raise ValueError("Corrupt snapshot")
+            if row.dish_snapshot is not None:
+                validate_snapshot(row.dish_snapshot, row.dish_id)
             slots[(row.day_index, row.meal)] = Slot(suggestion, row.state, row.dish_snapshot)
         return WeeklyMenu(root.week_start, root.version, slots, root.undo_payload)
 
@@ -66,8 +68,10 @@ class DjangoPlanningRepository:
         recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
         effective = (recipe.published or recipe.draft) if recipe else None
         status = "published" if recipe and recipe.published is not None else "draft" if recipe and recipe.draft is not None else "missing"
-        return {"schema_version": 1, "dish_id": dish.pk, "name": dish.name,
+        snapshot = {"schema_version": 1, "dish_id": dish.pk, "name": dish.name,
                 "primary_category": {"key": dish.primary_category_id, "name": dish.primary_category.name_ca},
                 "secondary_categories": [{"key": key, "name": name} for key, name in dish.secondary_categories.order_by("category_id").values_list("category_id", "category__name_ca")],
                 "meal_preference": dish.meal_preference, "special_occasion": dish.special_occasion,
                 "recipe_status": status, "recipe_content": effective}
+        validate_snapshot(snapshot, dish.pk)
+        return snapshot

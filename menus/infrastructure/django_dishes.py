@@ -1,5 +1,5 @@
-from django.db import transaction
-from menus.application.dishes import DishConflict
+from django.db import IntegrityError, transaction
+from menus.application.dishes import DishConflict, DuplicateReceipt
 from menus.infrastructure.django_planning import DjangoPlanningRepository
 from menus.models import CreationReceipt, DishRecord, SecondaryCategoryRecord, WeeklyMenuRecord
 
@@ -12,7 +12,10 @@ class DjangoDishRepository:
         return CreationReceipt.objects.filter(pk=token).values_list("operation", "scope", "digest", "result_id").first()
 
     def add_receipt(self, token, operation, scope, digest, result_id):
-        CreationReceipt.objects.create(token=token, operation=operation, scope=scope, digest=digest, result_id=result_id)
+        try:
+            CreationReceipt.objects.create(token=token, operation=operation, scope=scope, digest=digest, result_id=result_id)
+        except IntegrityError as exc:
+            raise DuplicateReceipt() from exc
 
     def create_dish(self, data):
         dish = DishRecord.objects.create(name=data.name, primary_category_id=data.primary_category,

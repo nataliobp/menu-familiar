@@ -15,6 +15,7 @@ def unavailable():
     return HttpResponse("El servei no està disponible. Torna-ho a provar.", status=503)
 
 
+@require_http_methods(["GET"])
 def template_view(request):
     try:
         template, categories = get_template(DjangoTemplateRepository())
@@ -49,7 +50,7 @@ def template_edit(request, day, meal):
                 error, status = "Selecciona una categoria vàlida.", 400
             except TemplateConflict:
                 error, status = "La plantilla ha canviat. Revisa la selecció i torna-ho a provar.", 409
-        return render(request, "menus/template_edit.html", {"day": DAYS[day], "meal": MEALS[meal], "categories": categories.items(), "selected": selected, "version": template.version, "error": error}, status=status)
+        return render(request, "menus/template_edit.html", {"day": DAYS[day], "meal": MEALS[meal], "categories": categories.items(), "selected": selected, "selected_label": categories.get(selected, "Lliure"), "current_label": categories.get(template.slots[(day, meal)], "Lliure"), "version": template.version, "error": error}, status=status)
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
@@ -73,10 +74,12 @@ def parse_week(value):
         raise Http404()
 
 
+@require_http_methods(["GET"])
 def current_menu(request):
     return redirect("menu_week", week=monday(MadridClock().today()).isoformat())
 
 
+@require_http_methods(["GET"])
 def menu_view(request, week):
     week = parse_week(week)
     repo, clock = DjangoPlanningRepository(), MadridClock()
@@ -100,7 +103,7 @@ def menu_view(request, week):
                 meals.append((meal, MEALS[meal], slot))
             days.append((day, label, meals))
         return render(request, "menus/menu.html", {"week": week, "days": days, "menu": menu,
-                      "editable": editable, "previous": week - timedelta(days=7), "next": week + timedelta(days=7)})
+                      "editable": editable, "week_end": week + timedelta(days=6), "previous": week - timedelta(days=7), "next": week + timedelta(days=7)})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
@@ -174,6 +177,7 @@ def menu_action(request, week, day, meal, action):
         return unavailable()
 
 
+@require_http_methods(["GET"])
 def slot_detail(request, week, day, meal):
     week = parse_week(week)
     if day not in range(7) or meal not in MEALS:
@@ -235,15 +239,15 @@ def move_choice(request, week, day, meal):
 @require_POST
 def move_action(request, week, action):
     week = parse_week(week)
-    if action not in ("move", "undo"):
+    if action not in ("move", "exchange", "undo"):
         raise Http404()
     try:
         version = int(request.POST.get("version", ""))
         source = destination = None
-        if action == "move":
+        if action in ("move", "exchange"):
             source = (int(request.POST.get("source_day", "")), request.POST.get("source_meal"))
             destination = (int(request.POST.get("destination_day", "")), request.POST.get("destination_meal"))
-        move_or_undo(DjangoPlanningRepository(), MadridClock(), week, version, source, destination, request.POST.get("confirm") == "yes")
+        move_or_undo(DjangoPlanningRepository(), MadridClock(), week, version, source, destination, request.POST.get("confirm") == "yes", action)
         return redirect("menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
@@ -260,6 +264,7 @@ from menus.domain.dish_edit import DishInput
 from menus.infrastructure.django_dishes import DjangoDishRepository
 
 
+@require_http_methods(["GET"])
 def catalogue(request):
     archived = request.GET.get("archived") == "1"
     query = request.GET.get("q", "")
@@ -274,6 +279,7 @@ def catalogue(request):
         return unavailable()
 
 
+@require_http_methods(["GET"])
 def dish_detail(request, dish_id):
     dish = DishRecord.objects.filter(pk=dish_id).select_related("primary_category").first()
     if dish is None:
@@ -347,6 +353,7 @@ from menus.domain.recipe import recipe_content
 from menus.models import RecipeRecord
 
 
+@require_http_methods(["GET"])
 def recipe_view(request, dish_id):
     dish = DishRecord.objects.filter(pk=dish_id).first()
     if not dish:
@@ -356,7 +363,11 @@ def recipe_view(request, dish_id):
     return render(request, "menus/recipe.html", {"dish": dish, "recipe": recipe, "content": content})
 
 
-def recipe_editor(request, dish_id, week=None, day=None, meal=None):
+@require_http_methods(["GET", "POST"])
+def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None):
+    if intent and request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(["POST"])
     context = None
     if week is not None:
         week = parse_week(week)
@@ -385,8 +396,12 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None):
         tastes = set(request.POST.getlist("taste"))
         lines = [{"name": name, "quantity": quantities[i] if i < len(quantities) else "", "unit": units[i] if i < len(units) else "", "note": notes[i] if i < len(notes) else "", "taste": str(i) in tastes} for i, name in enumerate(names)]
         values = {"preparation": request.POST.get("preparation", ""), "lines": lines, "version": request.POST.get("version", "")}
-        action = request.POST.get("action")
-        if action == "add_row":
+        action = intent or request.POST.get("action")
+        if action == "review_discard":
+            return render(request, "menus/recipe_discard.html", {"dish": dish, "values": values, "week": week, "day": day, "meal": meal})
+        if action == "continue":
+            pass
+        elif action == "add_row":
             lines.append({})
         elif action and action.startswith("remove_row:"):
             try:
@@ -419,10 +434,12 @@ from menus.application.shopping import mutate_shopping
 from menus.infrastructure.django_shopping import DjangoShoppingRepository, ShoppingConflict
 
 
+@require_http_methods(["GET"])
 def current_shopping(request):
     return redirect("shopping_week", week=monday(MadridClock().today()).isoformat())
 
 
+@require_http_methods(["GET"])
 def shopping_view(request, week):
     week = parse_week(week)
     try:
@@ -462,19 +479,61 @@ def shopping_action(request, week, action):
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
     except ShoppingConflict:
-        return HttpResponse("El contingut ha canviat. Actualitza la pàgina abans de tornar-ho a provar.", status=409)
+        try:
+            with transaction.atomic():
+                current_view = DjangoShoppingRepository().read(week)
+                current_rows = current_view[2] if current_view else []
+                current_manual = list(current_view[1].manual_items.all()) if current_view and current_view[1] else []
+        except (DatabaseError, ValueError):
+            return unavailable()
+        return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
+                      "error": "El contingut ha canviat. Revisa les dades abans de tornar-ho a provar.", "conflict": True,
+                      "current_rows": current_rows, "current_manual": current_manual}, status=409)
     except (ValueError, TypeError, KeyError):
-        return HttpResponse("Revisa les dades del producte.", status=400)
+        return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
+                      "error": "Revisa les dades del producte.", "menu_version": request.POST.get("menu_version", ""),
+                      "overlay_version": request.POST.get("overlay_version", "")}, status=400)
     except (DatabaseError, Rollover):
         return unavailable()
 
 
+@require_http_methods(["GET"])
 def healthz(request):
     from django.db import connection
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
+            cursor.execute("SELECT 1 FROM django_migrations LIMIT 1")
             cursor.fetchone()
         return HttpResponse("OK", content_type="text/plain")
     except DatabaseError:
         return HttpResponse("Unavailable", status=503, content_type="text/plain")
+
+
+@require_http_methods(["GET", "POST"])
+def shopping_form(request, week, action, item_id=None):
+    week = parse_week(week)
+    if action not in ("manual_add", "manual_edit", "manual_remove", "adjust"):
+        raise Http404()
+    if request.method == "POST":
+        if item_id is not None and request.POST.get("id") != str(item_id):
+            return HttpResponse("Producte invàlid.", status=400)
+        return shopping_action(request, week.isoformat(), action)
+    try:
+        with transaction.atomic():
+            view = DjangoShoppingRepository().read(week)
+            if not view:
+                raise Http404()
+            menu, state, rows, _, _, _ = view
+            if week < monday(MadridClock().today()):
+                return HttpResponse("Aquesta setmana és només de consulta.", status=403)
+            item = state.manual_items.filter(pk=item_id).first() if state and item_id is not None else None
+            if item_id is not None and item is None:
+                raise Http404()
+            key, family = request.GET.get("key", ""), request.GET.get("family", "")
+            row = next((candidate for candidate in rows if candidate["key"] == (key, family)), None)
+            if action == "adjust" and (not row or family == "taste"):
+                raise Http404()
+        return render(request, "menus/shopping_form.html", {"week": week, "menu": menu, "state": state,
+                      "action": action, "item": item, "row": row, "token": str(uuid4())})
+    except (DatabaseError, ValueError, KeyError):
+        return unavailable()

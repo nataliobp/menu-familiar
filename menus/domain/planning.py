@@ -99,3 +99,30 @@ class WeeklyMenu:
             slot.state, slot.dish = value
         self.undo = None
         return True
+
+
+def validate_snapshot(value, dish_id):
+    from menus.domain.recipe import recipe_content
+    if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("dish_id") != dish_id:
+        raise ValueError("Invalid dish snapshot")
+    required = {"schema_version", "dish_id", "name", "primary_category", "secondary_categories", "meal_preference", "special_occasion", "recipe_status", "recipe_content"}
+    if set(value) != required or not isinstance(value["name"], str) or not value["name"].strip():
+        raise ValueError("Invalid dish snapshot")
+    if not isinstance(value["secondary_categories"], list):
+        raise ValueError("Invalid snapshot categories")
+    categories = [value["primary_category"], *value["secondary_categories"]]
+    if any(not isinstance(category, dict) or set(category) != {"key", "name"} or not isinstance(category["key"], str) or not category["key"] or not isinstance(category["name"], str) or not category["name"] for category in categories):
+        raise ValueError("Invalid snapshot categories")
+    keys = [category["key"] for category in categories]
+    if len(keys) != len(set(keys)) or value["meal_preference"] not in {"lunch", "dinner", "both"} or type(value["special_occasion"]) is not bool:
+        raise ValueError("Invalid snapshot metadata")
+    status, content = value["recipe_status"], value["recipe_content"]
+    if status not in {"missing", "draft", "published"} or (status == "missing") != (content is None):
+        raise ValueError("Invalid snapshot recipe")
+    if content is not None:
+        try:
+            lines = [{"name": item["name"], "quantity": item["quantity"] or "", "unit": item["unit"] or "", "note": item["note"], "taste": item["taste"]} for item in content["ingredients"]]
+            if recipe_content(content["preparation"], lines, status == "published") != content:
+                raise ValueError("Invalid snapshot recipe")
+        except (TypeError, KeyError, AttributeError) as exc:
+            raise ValueError("Invalid snapshot recipe") from exc
