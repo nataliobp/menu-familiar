@@ -4,6 +4,9 @@ from datetime import date, timedelta
 from menus.domain.template import POSITIONS
 
 
+MAX_WEEK_START = date.max - timedelta(days=6)
+
+
 def monday(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
@@ -27,7 +30,7 @@ class WeeklyMenu:
     undo: dict | None = None
 
     def __post_init__(self):
-        if self.week.weekday() != 0 or self.version < 1 or set(self.slots) != POSITIONS:
+        if self.week.weekday() != 0 or self.week > MAX_WEEK_START or self.version < 1 or set(self.slots) != POSITIONS:
             raise ValueError("Invalid menu")
 
     @classmethod

@@ -60,7 +60,7 @@ from datetime import date, timedelta
 from django.db import IntegrityError, transaction
 from django.views.decorators.http import require_POST
 from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, create_menu, get_menu
-from menus.domain.planning import monday
+from menus.domain.planning import MAX_WEEK_START, monday
 from menus.infrastructure.django_planning import DjangoPlanningRepository, MadridClock
 from menus.application.catalogue_queries import browse_dishes, get_dish, get_recipe, picker_dishes
 from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
@@ -69,7 +69,7 @@ from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 def parse_week(value):
     try:
         week = date.fromisoformat(value)
-        if week.isoformat() != value or week.weekday() != 0:
+        if week.isoformat() != value or week.weekday() != 0 or week > MAX_WEEK_START:
             raise ValueError()
         return week
     except ValueError:
@@ -105,7 +105,7 @@ def menu_view(request, week):
                 meals.append((meal, MEALS[meal], slot))
             days.append((day, label, meals))
         return render(request, "menus/menu.html", {"week": week, "days": days, "menu": menu,
-                      "editable": editable, "week_end": week + timedelta(days=6), "previous": week - timedelta(days=7), "next": week + timedelta(days=7)})
+                      "editable": editable, "week_end": week + timedelta(days=6), "previous": week - timedelta(days=7) if week >= date.min + timedelta(days=7) else None, "next": week + timedelta(days=7) if week <= MAX_WEEK_START - timedelta(days=7) else None})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
@@ -228,8 +228,26 @@ def move_choice(request, week, day, meal):
             raise Http404()
         if week < monday(MadridClock().today()):
             return HttpResponse("Aquesta setmana és només de consulta.", status=403)
-        choices = [(d, DAYS[d], m, MEALS[m], menu.slots[(d, m)]) for d in range(7) for m in MEALS if (d, m) != (day, meal)]
-        return render(request, "menus/move.html", {"week": week, "day": day, "meal": meal, "menu": menu, "choices": choices})
+        context = {"week": week, "day": day, "meal": meal, "menu": menu}
+        if "destination_day" not in request.GET and "destination_meal" not in request.GET:
+            context["choices"] = [(d, DAYS[d], m, MEALS[m], menu.slots[(d, m)])
+                                  for d in range(7) for m in MEALS if (d, m) != (day, meal)]
+            return render(request, "menus/move.html", context)
+        try:
+            target_day = int(request.GET.get("destination_day", ""))
+            target_meal = request.GET["destination_meal"]
+            version = int(request.GET.get("version", ""))
+        except (KeyError, ValueError):
+            return HttpResponse("Destinació o versió invàlida.", status=400)
+        if target_day not in range(7) or target_meal not in MEALS or (target_day, target_meal) == (day, meal):
+            return HttpResponse("Destinació invàlida.", status=400)
+        if version != menu.version:
+            return HttpResponse("El contingut ha canviat. Torna a triar la destinació.", status=409)
+        target = menu.slots[target_day, target_meal]
+        context.update(target=target, target_day=target_day, target_meal=target_meal,
+                       target_label=DAYS[target_day], target_meal_label=MEALS[target_meal],
+                       action="exchange" if target.state == "selected" else "move")
+        return render(request, "menus/move.html", context)
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 

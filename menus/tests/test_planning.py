@@ -283,3 +283,43 @@ class PlanningTests(TestCase):
         self.assertEqual(DjangoCatalogueQueries().latest_dates()[self.dish.pk], future)
         move_or_undo(self.repo, self.clock, future, 2, (0, "lunch"), (4, "dinner"))
         self.assertEqual(DjangoCatalogueQueries().latest_dates()[self.dish.pk], future + timedelta(days=4))
+
+    def test_calendar_boundaries_do_not_overflow(self):
+        from django.urls import reverse
+        first = self.client.get(reverse("menu_week", args=["0001-01-01"]))
+        last = self.client.get(reverse("menu_week", args=["9999-12-20"]))
+        self.assertNotContains(first, "Setmana anterior")
+        self.assertNotContains(last, "Setmana següent")
+        self.assertEqual(self.client.get(reverse("menu_week", args=["9999-12-27"])).status_code, 404)
+
+    def test_move_review_preserves_version_and_requires_confirmed_post(self):
+        from unittest.mock import patch
+        from django.test import Client
+        from django.urls import reverse
+
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        change_menu(self.repo, self.clock, self.week, (1, "lunch"), 2, "skip")
+        date_key = self.week.isoformat()
+        review_url = reverse("move_choice", args=[date_key, 0, "lunch"])
+        post_url = reverse("move_action", args=[date_key, "move"])
+        destination = {"destination_day": 1, "destination_meal": "lunch", "version": 3}
+        submission = {**destination, "source_day": 0, "source_meal": "lunch", "confirm": "yes"}
+        client = Client(enforce_csrf_checks=True)
+
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            self.assertContains(client.get(review_url), "Tria la destinació")
+            response = client.get(review_url, destination)
+            self.assertContains(response, "Aquest àpat està omès.")
+            self.assertContains(response, 'name="version" value="3"')
+            self.assertEqual(client.get(review_url, {**destination, "version": 2}).status_code, 409)
+            self.assertEqual(client.get(post_url, submission).status_code, 405)
+            self.assertEqual(client.post(post_url, submission).status_code, 403)
+            self.assertEqual(self.repo.get(self.week).version, 3)
+            csrf = client.cookies["csrftoken"].value
+            self.assertEqual(client.post(post_url, {**submission, "csrfmiddlewaretoken": csrf}).status_code, 302)
+
+        menu = self.repo.get(self.week)
+        self.assertEqual(menu.version, 4)
+        self.assertEqual(menu.slots[0, "lunch"].state, "pending")
+        self.assertEqual(menu.slots[1, "lunch"].dish["dish_id"], self.dish.pk)
