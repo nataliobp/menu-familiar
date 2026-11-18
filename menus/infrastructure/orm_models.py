@@ -118,7 +118,11 @@ class GeneratedOverlayRecord(models.Model):
     checked = models.BooleanField(default=False)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["shopping", "ingredient_key", "family"], name="unique_shopping_overlay")]
+        constraints = [
+            models.UniqueConstraint(fields=["shopping", "ingredient_key", "family"], name="unique_shopping_overlay"),
+            models.CheckConstraint(condition=Q(family__in=["g", "ml", "unit", "taste"]), name="overlay_family_valid"),
+            models.CheckConstraint(condition=~Q(family="taste") | Q(last_base_quantity__isnull=True, adjusted_quantity__isnull=True), name="taste_overlay_unquantified"),
+        ]
 
 
 class ManualShoppingItemRecord(models.Model):
@@ -129,4 +133,7 @@ class ManualShoppingItemRecord(models.Model):
     checked = models.BooleanField(default=False)
 
     class Meta:
-        constraints = [models.CheckConstraint(condition=(Q(quantity__isnull=True, unit__isnull=True) | Q(quantity__isnull=False, unit__isnull=False)), name="manual_quantity_pair")]
+        constraints = [
+            models.CheckConstraint(condition=(Q(quantity__isnull=True, unit__isnull=True) | Q(quantity__isnull=False, unit__isnull=False)), name="manual_quantity_pair"),
+            models.CheckConstraint(condition=Q(unit__isnull=True) | Q(unit__in=["g", "kg", "ml", "l", "unit"]), name="manual_unit_valid"),
+        ]

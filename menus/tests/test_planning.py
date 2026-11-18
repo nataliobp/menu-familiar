@@ -159,3 +159,17 @@ class PlanningTests(TestCase):
         self.assertContains(response, "Ingredient")
         from menus.models import RecipeRecord
         self.assertFalse(RecipeRecord.objects.exists())
+
+    def test_shopping_retry_preserves_creation_token(self):
+        from unittest.mock import patch
+        from uuid import uuid4
+        from django.db import OperationalError
+        from django.urls import reverse
+        token = str(uuid4())
+        url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
+        data = {"menu_version": 1, "overlay_version": 0, "token": token, "name": "Producte de prova", "quantity": "", "unit": ""}
+        with patch("menus.web.views.mutate_shopping", side_effect=OperationalError("synthetic lock")):
+            response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(response, token, status_code=503)
+        self.assertContains(response, "Producte de prova", status_code=503)

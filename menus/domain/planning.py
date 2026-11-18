@@ -102,7 +102,7 @@ class WeeklyMenu:
 
 
 def validate_snapshot(value, dish_id):
-    from menus.domain.recipe import recipe_content
+    from menus.domain.recipe import validate_content
     if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("dish_id") != dish_id:
         raise ValueError("Invalid dish snapshot")
     required = {"schema_version", "dish_id", "name", "primary_category", "secondary_categories", "meal_preference", "special_occasion", "recipe_status", "recipe_content"}
@@ -120,9 +120,4 @@ def validate_snapshot(value, dish_id):
     if status not in {"missing", "draft", "published"} or (status == "missing") != (content is None):
         raise ValueError("Invalid snapshot recipe")
     if content is not None:
-        try:
-            lines = [{"name": item["name"], "quantity": item["quantity"] or "", "unit": item["unit"] or "", "note": item["note"], "taste": item["taste"]} for item in content["ingredients"]]
-            if recipe_content(content["preparation"], lines, status == "published") != content:
-                raise ValueError("Invalid snapshot recipe")
-        except (TypeError, KeyError, AttributeError) as exc:
-            raise ValueError("Invalid snapshot recipe") from exc
+        validate_content(content, status == "published")

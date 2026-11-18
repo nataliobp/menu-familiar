@@ -149,3 +149,32 @@ class DishTests(TestCase):
         from menus.models import RecipeRecord, DishRecord
         self.assertFalse(RecipeRecord.objects.filter(dish_id=dish_id).exists())
         self.assertEqual(DishRecord.objects.get(pk=dish_id).version, 1)
+
+    def test_historical_shopping_stays_frozen_after_recipe_edit(self):
+        from menus.application.recipes import save_recipe
+        from menus.domain.recipe import recipe_content
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        dishes, plans, shopping = DjangoDishRepository(), DjangoPlanningRepository(), DjangoShoppingRepository()
+        old_week = date(2026, 11, 16)
+        next_week = old_week + timedelta(days=7)
+        dish_id = create_dish(dishes, DishInput("Plat sintètic", "cereals", frozenset(), "both", False), uuid4())
+        first = recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
+        save_recipe(dishes, Clock(old_week), dish_id, 1, first, True)
+        for week in (old_week, next_week):
+            create_menu(plans, Clock(old_week), week)
+            change_menu(plans, Clock(old_week), week, (0, "lunch"), 1, "assign", dish_id)
+        second = recipe_content("Cou", [{"name": "Arròs", "quantity": "300", "unit": "g"}], True)
+        save_recipe(dishes, Clock(next_week), dish_id, 2, second, True)
+        self.assertEqual(str(shopping.read(old_week)[2][0]["quantity"]), "160.000")
+        self.assertEqual(str(shopping.read(next_week)[2][0]["quantity"]), "300.000")
+
+    def test_database_rejects_invalid_taste_overlay(self):
+        from django.db import IntegrityError, transaction
+        from menus.models import GeneratedOverlayRecord, ShoppingStateRecord
+        week = date(2026, 11, 16)
+        plans = DjangoPlanningRepository()
+        create_menu(plans, Clock(week), week)
+        state = ShoppingStateRecord.objects.create(week_id=week)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            GeneratedOverlayRecord.objects.create(shopping=state, ingredient_key="sal", family="taste", last_name="Sal", adjusted_quantity="1.000")
+        self.assertFalse(GeneratedOverlayRecord.objects.exists())

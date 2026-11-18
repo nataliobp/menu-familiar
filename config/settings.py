@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import tempfile
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -51,12 +52,18 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 database_path = os.environ.get("DJANGO_DB_PATH")
 if not database_path:
-    if not DEVELOPMENT:
-        raise ImproperlyConfigured("DJANGO_DB_PATH is required")
-    database_path = str(BASE_DIR / "db.sqlite3")
+    raise ImproperlyConfigured("DJANGO_DB_PATH is required")
 if not Path(database_path).is_absolute():
     raise ImproperlyConfigured("DJANGO_DB_PATH must be absolute")
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": database_path}}
+test_database_path = os.environ.get("DJANGO_TEST_DB_PATH")
+if test_database_path:
+    test_path = Path(test_database_path)
+    if (not DEVELOPMENT or not test_path.is_absolute()
+            or not test_path.resolve().is_relative_to(Path(tempfile.gettempdir()).resolve())
+            or test_path.exists()):
+        raise ImproperlyConfigured("DJANGO_TEST_DB_PATH must be a new temporary path in development mode")
+    DATABASES["default"]["TEST"] = {"NAME": test_database_path}
 LANGUAGE_CODE = "ca"
 TIME_ZONE = "Europe/Madrid"
 USE_I18N = True

@@ -16,4 +16,5 @@ class SettingsTests(TestCase):
         self.assertEqual(self.run_settings(DJANGO_SECRET_KEY="test", DJANGO_ALLOWED_HOSTS="localhost", DJANGO_DB_PATH="/tmp/disposable.sqlite3").returncode, 0)
 
     def test_development_is_explicit(self):
-        self.assertEqual(self.run_settings(DJANGO_ENV="development").returncode, 0)
+        self.assertNotEqual(self.run_settings(DJANGO_ENV="development").returncode, 0)
+        self.assertEqual(self.run_settings(DJANGO_ENV="development", DJANGO_DB_PATH="/tmp/disposable.sqlite3").returncode, 0)

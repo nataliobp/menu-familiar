@@ -23,7 +23,14 @@ Open `/menu/`. This is a development server, not production serving. Tests use i
 MENU_CATALOGUE_CSV=/absolute/path/to/private.csv .venv/bin/python manage.py test menus.tests.test_catalogue_import.SourceFidelityTests
 ```
 
-Without that variable the private-source test is skipped. Do not commit private data or copy its contents into logs. To import, first verify the target database path, run migrations, then run `python manage.py import_catalogue /absolute/path/to/private.csv`. The importer validates the entire source before a single atomic write and rejects conflicting IDs.
+The concurrent SQLite tests require a new file-backed test database under the system temporary directory. To run the full suite with them:
+
+```sh
+TEST_DIR="$(mktemp -d)"
+DJANGO_ENV=development DJANGO_DB_PATH="$TEST_DIR/unused.sqlite3" DJANGO_TEST_DB_PATH="$TEST_DIR/test.sqlite3" .venv/bin/python manage.py test --noinput
+```
+
+The test runner removes its test database. Without `DJANGO_TEST_DB_PATH`, these concurrency tests are skipped. Without the private-source variable the private-source test is skipped. Do not commit private data or copy its contents into logs. To import, first verify the target database path, run migrations, then run `python manage.py import_catalogue /absolute/path/to/private.csv`. The importer validates the entire source before a single atomic write and rejects conflicting IDs.
 
 ## Production configuration and release gates
 
@@ -33,7 +40,33 @@ Use an allowlisted build context staged outside the source directory, containing
 
 ## SQLite backup rehearsal
 
-Use explicit private paths and SQLite's online backup API; never copy an active database file alone or overwrite the live database during a rehearsal. Restrict access to backup files. For a stopped or running app, use a small Python program that opens the source read-only, opens a new destination outside the repository, calls `source.backup(destination)`, and checks `PRAGMA integrity_check` on the destination. Restore to a separate location, verify compatible migrations and representative synthetic records, then seek owner authorization before any production switch. Rolling back code after an incompatible migration may also require a matching backup.
+Use explicit private paths and SQLite's online backup API; never copy an active database file alone or overwrite the live database during a rehearsal. The destination must not already exist. For example, with paths selected outside the repository:
+
+```sh
+export MENU_BACKUP_SOURCE=/absolute/path/to/source.sqlite3
+export MENU_BACKUP_TARGET=/absolute/path/to/new-backup.sqlite3
+umask 077
+.venv/bin/python - <<'PYBACKUP'
+import os
+from pathlib import Path
+import sqlite3
+
+source = Path(os.environ["MENU_BACKUP_SOURCE"])
+target = Path(os.environ["MENU_BACKUP_TARGET"])
+if not source.is_absolute() or not target.is_absolute():
+    raise SystemExit("Both paths must be absolute")
+source = source.resolve(strict=True)
+fd = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+os.close(fd)
+with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as source_db:
+    with sqlite3.connect(target) as target_db:
+        source_db.backup(target_db)
+        if target_db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise SystemExit("Backup integrity check failed")
+PYBACKUP
+```
+
+Restore to a separate location, verify compatible migrations and representative synthetic records, then seek owner authorization before any production switch. Rolling back code after an incompatible migration may also require a matching backup.
 
 ## Consolidated manual owner QA (pending)
 

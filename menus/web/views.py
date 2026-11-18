@@ -165,7 +165,10 @@ def menu_action(request, week, day, meal, action):
     try:
         version = int(request.POST.get("version", ""))
         dish_id = int(request.POST.get("dish", "0"))
+        if action in ("assign", "replace") and not 1 <= dish_id < 9223372036854775807:
+            raise ValueError("Invalid dish identifier")
         change_menu(DjangoPlanningRepository(), MadridClock(), week, (day, meal), version, action, dish_id, request.POST.get("confirm") == "yes")
+        messages.success(request, "Canvi desat")
         return redirect("menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
@@ -248,6 +251,7 @@ def move_action(request, week, action):
             source = (int(request.POST.get("source_day", "")), request.POST.get("source_meal"))
             destination = (int(request.POST.get("destination_day", "")), request.POST.get("destination_meal"))
         move_or_undo(DjangoPlanningRepository(), MadridClock(), week, version, source, destination, request.POST.get("confirm") == "yes", action)
+        messages.success(request, "Canvi desat")
         return redirect("menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
@@ -349,17 +353,28 @@ def dish_archive(request, dish_id, action):
     return render(request, "menus/dish_archive.html", {"dish": dish, "action": action})
 
 from menus.application.recipes import save_recipe
-from menus.domain.recipe import recipe_content
+from menus.domain.recipe import recipe_content, validate_content
 from menus.models import RecipeRecord
 
 
 @require_http_methods(["GET"])
 def recipe_view(request, dish_id):
-    dish = DishRecord.objects.filter(pk=dish_id).first()
-    if not dish:
-        raise Http404()
-    recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
+    try:
+        with transaction.atomic():
+            dish = DishRecord.objects.filter(pk=dish_id).first()
+            if not dish:
+                raise Http404()
+            recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
+    except DatabaseError:
+        return unavailable()
     content = (recipe.published or recipe.draft) if recipe else None
+    try:
+        if recipe and recipe.published is not None:
+            validate_content(recipe.published, True)
+        if recipe and recipe.draft is not None:
+            validate_content(recipe.draft)
+    except ValueError:
+        return unavailable()
     return render(request, "menus/recipe.html", {"dish": dish, "recipe": recipe, "content": content})
 
 
@@ -385,6 +400,13 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
         raise Http404()
     recipe = RecipeRecord.objects.filter(dish_id=dish_id).first()
     content = (recipe.draft or recipe.published) if recipe else None
+    try:
+        if recipe and recipe.published is not None:
+            validate_content(recipe.published, True)
+        if recipe and recipe.draft is not None:
+            validate_content(recipe.draft)
+    except ValueError:
+        return unavailable()
     lines = content["ingredients"] if content else []
     values = {"preparation": content["preparation"] if content else "", "lines": lines or [{}], "version": dish.version}
     error, status = None, 200
@@ -415,6 +437,7 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
                 cleaned = [line for line in lines if any((line["name"].strip(), line["quantity"].strip(), line["unit"], line["note"].strip(), line["taste"]))]
                 content = recipe_content(values["preparation"], cleaned, action == "publish")
                 save_recipe(DjangoDishRepository(), MadridClock(), dish_id, int(values["version"]), content, action == "publish", context)
+                messages.success(request, "Recepta publicada" if action == "publish" else "Esborrany desat")
                 if context:
                     return redirect("slot_detail", week=week.isoformat(), day=day, meal=meal)
                 return redirect("recipe_view", dish_id=dish_id)
@@ -425,7 +448,7 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
             except PastWeek:
                 return HttpResponse("Aquesta setmana és només de consulta.", status=403)
             except (DatabaseError, Rollover):
-                return unavailable()
+                error, status = "No s’ha pogut desar. Revisa les dades abans de tornar-ho a provar.", 503
         else:
             error, status = "Acció invàlida.", 400
     return render(request, "menus/recipe_edit.html", {"dish": dish, "values": values, "error": error, "conflict": status == 409, "week": week, "day": day, "meal": meal}, status=status)
@@ -494,7 +517,10 @@ def shopping_action(request, week, action):
                       "error": "Revisa les dades del producte.", "menu_version": request.POST.get("menu_version", ""),
                       "overlay_version": request.POST.get("overlay_version", "")}, status=400)
     except (DatabaseError, Rollover):
-        return unavailable()
+        return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
+                      "error": "No s’ha pogut completar l’acció. Revisa la llista abans de tornar-ho a provar.",
+                      "menu_version": request.POST.get("menu_version", ""),
+                      "overlay_version": request.POST.get("overlay_version", "")}, status=503)
 
 
 @require_http_methods(["GET"])
@@ -506,7 +532,7 @@ def healthz(request):
             cursor.fetchone()
         return HttpResponse("OK", content_type="text/plain")
     except DatabaseError:
-        return HttpResponse("Unavailable", status=503, content_type="text/plain")
+        return HttpResponse("No disponible", status=503, content_type="text/plain")
 
 
 @require_http_methods(["GET", "POST"])

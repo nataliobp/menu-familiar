@@ -61,6 +61,8 @@ def aggregate(slots):
                             raise ValueError("Shopping total overflow")
                 if line["note"]:
                     rows[key]["notes"].add(line["note"])
+        for row in rows.values():
+            row["notes"] = tuple(sorted(row["notes"]))
         return sorted(rows.values(), key=lambda row: (row["key"][0], ORDER[row["key"][1]])), pending, incomplete
 
 

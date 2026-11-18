@@ -45,3 +45,12 @@ def recipe_content(preparation, lines, publish=False):
     if publish and (not preparation.strip() or not ingredients):
         raise ValueError("Incomplete recipe")
     return {"schema_version": 1, "preparation": preparation, "ingredients": ingredients}
+
+
+def validate_content(content, published=False):
+    try:
+        lines = [{"name": item["name"], "quantity": item["quantity"] or "", "unit": item["unit"] or "", "note": item["note"], "taste": item["taste"]} for item in content["ingredients"]]
+        if recipe_content(content["preparation"], lines, published) != content:
+            raise ValueError("Invalid persisted recipe")
+    except (TypeError, KeyError, AttributeError) as exc:
+        raise ValueError("Invalid persisted recipe") from exc

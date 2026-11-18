@@ -23,3 +23,17 @@ class ShoppingTests(TestCase):
         slot = Slot(None, "selected", {"name": "Plat", "recipe_status": "published", "recipe_content": content})
         with self.assertRaises(ValueError):
             aggregate({(0, "lunch"): slot})
+
+    def test_maximum_total_and_override_boundaries(self):
+        from menus.domain.recipe import parse_amount
+        line = {"name": "Farina", "quantity": "999999999.999", "unit": "kg"}
+        content = recipe_content("Cou", [line] * 100, True)
+        slots = {(day, meal): Slot(None, "selected", {"name": "Plat", "recipe_status": "published", "recipe_content": content})
+                 for day in range(7) for meal in ("lunch", "dinner")}
+        rows, _, _ = aggregate(slots)
+        self.assertEqual(rows[0]["quantity"], Decimal("1399999999998600.000"))
+        self.assertEqual(parse_amount("1399999999998600.000", Decimal("1399999999998600.000")), "1399999999998600.000")
+        with self.assertRaises(ValueError):
+            parse_amount("1399999999998600.001", Decimal("1399999999998600.000"))
+        with self.assertRaises(ValueError):
+            recipe_content("Cou", [line] * 101, True)

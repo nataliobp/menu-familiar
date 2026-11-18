@@ -34,6 +34,12 @@ class CSVTests(TestCase):
         dish = self.parse([ROW])[0]
         self.assertEqual(dish, CatalogueDish(1, "Arròs, verd", "Cereals", frozenset({"Verdures"}), "both", False))
 
+    def test_reordered_headers_and_multiple_categories(self):
+        headers = list(reversed(HEADERS))
+        row = ["7", "Plat sintètic", "Cereals", "Verdures, Ous", "both", "false", "pending", "ignored"]
+        dish = self.parse([list(reversed(row))], headers)[0]
+        self.assertEqual(dish.secondary_categories, frozenset({"Verdures", "Ous"}))
+
     def test_invalid_data_is_rejected(self):
         cases = [
             ([ROW, ROW], HEADERS),
@@ -44,6 +50,11 @@ class CSVTests(TestCase):
             ([[*ROW[:4], "breakfast", *ROW[5:]]], HEADERS),
             ([[*ROW[:5], "False", *ROW[6:]]], HEADERS),
             ([[ROW[0], "", *ROW[2:]]], HEADERS),
+            ([["9223372036854775807", *ROW[1:]]], HEADERS),
+            ([[ROW[0], "x" * 201, *ROW[2:]]], HEADERS),
+            ([[*ROW[:2], "Desconeguda", *ROW[3:]]], HEADERS),
+            ([[*ROW[:3], "Verdures, Verdures", *ROW[4:]]], HEADERS),
+            ([[*ROW[:3], "Cereals", *ROW[4:]]], HEADERS),
         ]
         for rows, headers in cases:
             with self.subTest(rows=rows, headers=headers), self.assertRaises(InvalidCatalogue):
