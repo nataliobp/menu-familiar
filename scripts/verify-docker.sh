@@ -66,19 +66,25 @@ mkdir "$context" "$work/data"
 
 printf '\n== Build context and Compose configuration ==\n'
 git ls-tree -r "$ref" -- .dockerignore Dockerfile requirements.txt manage.py config menus >"$work/git-tree"
-while read -r mode type oid path; do
-    case "$path" in
-        menus/tests/*|*/__pycache__/*) continue ;;
-        .dockerignore|Dockerfile|requirements.txt|manage.py|config/*.py|menus/*.py|menus/templates/*|menus/static/*) ;;
-        *) continue ;;
-    esac
-    case "$mode:$type" in
-        100644:blob|100755:blob) ;;
-        *) printf 'Unexpected Git entry: %s\n' "$path"; exit 1 ;;
-    esac
-    mkdir -p "$(dirname -- "$context/$path")"
-    git cat-file blob "$oid" >"$context/$path"
-done <"$work/git-tree"
+(
+    # Keep the temporary parent private while preserving source access for the
+    # non-root image user. Docker COPY preserves the file and directory modes.
+    umask 022
+    while read -r mode type oid path; do
+        case "$path" in
+            menus/tests/*|*/__pycache__/*) continue ;;
+            .dockerignore|Dockerfile|requirements.txt|manage.py|config/*.py|menus/*.py|menus/templates/*|menus/static/*) ;;
+            *) continue ;;
+        esac
+        case "$mode:$type" in
+            100644:blob|100755:blob) ;;
+            *) printf 'Unexpected Git entry: %s\n' "$path"; exit 1 ;;
+        esac
+        mkdir -p "$(dirname -- "$context/$path")"
+        git cat-file blob "$oid" >"$context/$path"
+        if [ "$mode" = 100755 ]; then chmod 755 "$context/$path"; fi
+    done <"$work/git-tree"
+)
 git show "$ref:compose.yaml" >"$work/compose.yaml"
 cat >"$work/compose.env" <<EOF
 DJANGO_SECRET_KEY=qa-compose-placeholder-only
@@ -138,6 +144,8 @@ assert {p.name for p in root.iterdir()} == root_entries, "Unexpected files at im
 for path in root.rglob("*"):
     relative = path.relative_to(root)
     assert not path.is_symlink(), f"Unexpected symlink: {relative}"
+    mode = os.R_OK | os.X_OK if path.is_dir() else os.R_OK
+    assert os.access(path, mode), f"Application user cannot access: {relative}"
     if relative.parts[0] == "staticfiles":
         continue
     assert path.name not in {".env", ".git", ".venv", "tests", "PLATOS_57.csv"}, relative
