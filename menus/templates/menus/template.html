@@ -1,0 +1,3 @@
+{% extends "menus/base.html" %}{% block title %}Plantilla setmanal{% endblock %}{% block content %}
+<h1>Plantilla setmanal</h1><p>Tria una categoria orientativa per a cada àpat.</p><div class="week">
+{% for index, day, meals in days %}<section><h2>{{ day }}</h2>{% for meal, label, category in meals %}<a class="slot" href="{% url 'template_edit' index meal %}"><span>{{ label }}</span><strong>{{ category }}</strong></a>{% endfor %}</section>{% endfor %}</div>{% endblock %}

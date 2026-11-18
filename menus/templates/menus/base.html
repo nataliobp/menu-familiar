@@ -1,0 +1,3 @@
+<!doctype html>
+<html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block title %}Menú familiar{% endblock %}</title>{% load static %}<link rel="stylesheet" href="{% static 'menus/app.css' %}"></head>
+<body><header><strong>Menú familiar</strong><nav><a href="{% url 'current_menu' %}">Menú setmanal</a> · <a href="{% url 'catalogue' %}">Plats</a> · <a href="{% url 'weekly_template' %}">Plantilla</a> · <a href="{% url 'current_shopping' %}">Llista de la compra</a></nav></header><main>{% for message in messages %}<p role="status">{{ message }}</p>{% endfor %}{% block content %}{% endblock %}</main></body></html>

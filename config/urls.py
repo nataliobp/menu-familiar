@@ -1,4 +1,30 @@
-from django.contrib import admin
 from django.urls import path
+from menus.web import views
 
-urlpatterns = [path("admin/", admin.site.urls)]
+urlpatterns = [
+    path("healthz", views.healthz, name="healthz"),
+    path("", views.current_menu),
+    path("menu/", views.current_menu, name="current_menu"),
+    path("menu/<str:week>/", views.menu_view, name="menu_week"),
+    path("menu/<str:week>/create/", views.menu_create, name="menu_create"),
+    path("menu/<str:week>/<str:action>/", views.move_action, name="move_action"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/move/", views.move_choice, name="move_choice"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/triar/", views.menu_picker, name="menu_picker"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/", views.slot_detail, name="slot_detail"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/remove/", views.menu_confirm, {"action": "remove"}, name="confirm_remove"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/skip/", views.menu_confirm, {"action": "skip"}, name="confirm_skip"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/<str:action>/", views.menu_action, name="menu_action"),
+    path("compra/", views.current_shopping, name="current_shopping"),
+    path("compra/<str:week>/", views.shopping_view, name="shopping_week"),
+    path("compra/<str:week>/<str:action>/", views.shopping_action, name="shopping_action"),
+    path("plats/", views.catalogue, name="catalogue"),
+    path("plats/new/", views.dish_edit, name="dish_create"),
+    path("plats/<int:dish_id>/", views.dish_detail, name="dish_detail"),
+    path("plats/<int:dish_id>/edit/", views.dish_edit, name="dish_edit"),
+    path("plats/<int:dish_id>/recepta/", views.recipe_view, name="recipe_view"),
+    path("plats/<int:dish_id>/recepta/edit/", views.recipe_editor, name="recipe_edit"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/recepta/edit/", views.recipe_editor, {"dish_id": None}, name="slot_recipe_edit"),
+    path("plats/<int:dish_id>/<str:action>/", views.dish_archive, name="dish_archive"),
+    path("plantilla/", views.template_view, name="weekly_template"),
+    path("plantilla/<int:day>/<str:meal>/", views.template_edit, name="template_edit"),
+]

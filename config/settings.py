@@ -1,11 +1,22 @@
 from pathlib import Path
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "local-development-only-insecure-key")
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+DEVELOPMENT = os.environ.get("DJANGO_ENV") == "development"
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEVELOPMENT:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY is required")
+    SECRET_KEY = "local-development-only-insecure-key"
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if host.strip()]
+if not ALLOWED_HOSTS:
+    if not DEVELOPMENT:
+        raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS is required")
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -18,6 +29,7 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -38,10 +50,20 @@ TEMPLATES = [{
 }]
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
-LANGUAGE_CODE = "es"
-TIME_ZONE = "UTC"
+database_path = os.environ.get("DJANGO_DB_PATH")
+if not database_path:
+    if not DEVELOPMENT:
+        raise ImproperlyConfigured("DJANGO_DB_PATH is required")
+    database_path = str(BASE_DIR / "db.sqlite3")
+if not Path(database_path).is_absolute():
+    raise ImproperlyConfigured("DJANGO_DB_PATH must be absolute")
+DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": database_path}}
+LANGUAGE_CODE = "ca"
+TIME_ZONE = "Europe/Madrid"
 USE_I18N = True
 USE_TZ = True
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+            "staticfiles": {"BACKEND": ("django.contrib.staticfiles.storage.StaticFilesStorage" if DEVELOPMENT else "whitenoise.storage.CompressedManifestStaticFilesStorage")}}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -1,0 +1,103 @@
+from datetime import date, timedelta
+from uuid import uuid4
+from django.test import TestCase
+from menus.application.dishes import DishConflict, create_dish, update_dish
+from menus.application.planning import create_menu, change_menu
+from menus.domain.dish_edit import DishInput
+from menus.infrastructure.django_dishes import DjangoDishRepository
+from menus.infrastructure.django_planning import DjangoPlanningRepository
+from menus.tests.test_planning import Clock
+
+
+class DishTests(TestCase):
+    def test_receipt_replay_and_conflict(self):
+        repo = DjangoDishRepository()
+        token = uuid4()
+        data = DishInput("Plat", "cereals", frozenset({"vegetables"}), "both", False)
+        first = create_dish(repo, data, token)
+        self.assertEqual(create_dish(repo, data, token), first)
+        with self.assertRaises(DishConflict):
+            create_dish(repo, DishInput("Altre", "cereals", frozenset(), "both", False), token)
+
+    def test_edit_updates_only_editable_snapshots(self):
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        data = DishInput("Plat", "cereals", frozenset(), "both", False)
+        dish_id = create_dish(dishes, data, uuid4())
+        for target in (week, week + timedelta(days=7)):
+            create_menu(plans, Clock(week), target)
+            change_menu(plans, Clock(week), target, (0, "lunch"), 1, "assign", dish_id)
+        update_dish(dishes, Clock(week + timedelta(days=7)), dish_id, DishInput("Nou", "eggs", frozenset(), "both", False), 1)
+        self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["name"], "Plat")
+        self.assertEqual(plans.get(week + timedelta(days=7)).slots[(0, "lunch")].dish["name"], "Nou")
+
+    def test_recipe_effective_draft_and_publication_refresh(self):
+        from menus.application.recipes import save_recipe
+        from menus.domain.recipe import recipe_content
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        draft = recipe_content("", [{"name": "Arròs", "quantity": "", "unit": "g"}])
+        save_recipe(dishes, Clock(week), dish_id, 1, draft)
+        self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["recipe_status"], "draft")
+        published = recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
+        save_recipe(dishes, Clock(week), dish_id, 2, published, True)
+        save_recipe(dishes, Clock(week), dish_id, 3, draft)
+        snapshot = plans.get(week).slots[(0, "lunch")].dish
+        self.assertEqual(snapshot["recipe_status"], "published")
+        self.assertEqual(snapshot["recipe_content"], published)
+
+    def test_shopping_reconciliation_preserves_adjusted_orphan(self):
+        from menus.application.recipes import save_recipe
+        from menus.application.shopping import mutate_shopping
+        from menus.domain.recipe import recipe_content
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        dishes, plans, shopping = DjangoDishRepository(), DjangoPlanningRepository(), DjangoShoppingRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
+        save_recipe(dishes, Clock(week), dish_id, 1, recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True), True)
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {"key": "arròs", "family": "g", "quantity": "200"})
+        change_menu(plans, Clock(week), week, (0, "lunch"), 2, "remove")
+        view = shopping.read(week)
+        self.assertEqual(len(view[-1]), 1)
+        self.assertEqual(view[-1][0].adjusted_quantity, "200.000")
+
+    def test_manual_receipt_replay_survives_deletion_and_rollover(self):
+        from menus.application.shopping import mutate_shopping
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository, ShoppingConflict
+        from menus.models import ManualShoppingItemRecord
+        plans, shopping = DjangoPlanningRepository(), DjangoShoppingRepository()
+        week = date(2026, 11, 16)
+        create_menu(plans, Clock(week), week)
+        data = {"name": "Pa", "quantity": "", "unit": "", "token": str(uuid4())}
+        mutate_shopping(shopping, Clock(week), week, 1, 0, "manual_add", data)
+        item = ManualShoppingItemRecord.objects.get()
+        item_id = item.pk
+        mutate_shopping(shopping, Clock(week), week, 1, 1, "manual_remove", {"id": item_id})
+        self.assertEqual(mutate_shopping(shopping, Clock(week + timedelta(days=7)), week, 1, 0, "manual_add", data), item_id)
+        self.assertFalse(ManualShoppingItemRecord.objects.exists())
+        with self.assertRaises(ShoppingConflict):
+            mutate_shopping(shopping, Clock(week), week, 1, 2, "manual_add", {**data, "name": "Llet"})
+
+    def test_failed_propagation_rolls_back_dish_and_weeks(self):
+        from unittest.mock import patch
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
+        for target in (week, week + timedelta(days=7)):
+            create_menu(plans, Clock(week), target)
+            change_menu(plans, Clock(week), target, (0, "lunch"), 1, "assign", dish_id)
+        original = DjangoPlanningRepository.save
+        def fail_later(repository, menu, version):
+            if menu.week > week:
+                raise RuntimeError("synthetic failure")
+            return original(repository, menu, version)
+        with patch.object(DjangoPlanningRepository, "save", fail_later), self.assertRaises(RuntimeError):
+            update_dish(dishes, Clock(week), dish_id, DishInput("Nou", "eggs", frozenset(), "both", False), 1)
+        from menus.models import DishRecord
+        self.assertEqual(DishRecord.objects.get(pk=dish_id).name, "Plat")
+        self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["name"], "Plat")
