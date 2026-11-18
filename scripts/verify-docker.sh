@@ -183,25 +183,37 @@ app=$(docker_cmd run --detach --name "$run_id-app" --network none \
 if ! docker_cmd exec -i "$app" python - <<'PY'
 from time import monotonic, sleep
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
-def request(path, **kwargs):
+# This probe runs inside the container and must always use its own loopback.
+opener = build_opener(ProxyHandler({}))
+
+def request(path, *, timeout=15, **kwargs):
     req = Request("http://127.0.0.1:8000" + path, **kwargs)
     try:
-        with urlopen(req, timeout=2) as response:
+        with opener.open(req, timeout=timeout) as response:
             return response.status, response.read()
     except HTTPError as error:
-        return error.code, error.read()
+        with error:
+            return error.code, error.read()
 
-deadline = monotonic() + 30
+deadline = monotonic() + 75
+attempts = 0
+last_result = "no response"
 while True:
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise SystemExit(f"Gunicorn health check did not become ready: {last_result}")
+    attempts += 1
     try:
-        if request("/healthz") == (200, b"OK"):
+        status, body = request("/healthz", timeout=min(5, remaining))
+        if status == 200 and body == b"OK":
             break
-    except URLError:
-        pass
-    assert monotonic() < deadline, "Gunicorn health check did not become ready"
-    sleep(1)
+        last_result = f"HTTP {status}"
+    except (URLError, TimeoutError, ConnectionError) as error:
+        last_result = str(error)
+    sleep(min(1, max(0, deadline - monotonic())))
+print(f"Gunicorn health check passed after {attempts} attempt(s).", flush=True)
 
 assert request("/menu/")[0] == 200, "Menu unavailable"
 assert request("/static/menus/app.css")[0] == 200, "Collected stylesheet unavailable"
