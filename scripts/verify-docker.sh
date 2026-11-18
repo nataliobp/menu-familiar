@@ -2,6 +2,11 @@
 # Verify the committed application in disposable Docker resources.
 set -eu
 umask 077
+case "${1:-}" in
+    "") keep_image=false ;;
+    --keep-image) keep_image=true ;;
+    *) printf 'Usage: %s [--keep-image]\n' "$0" >&2; exit 2 ;;
+esac
 
 repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo"
@@ -92,6 +97,7 @@ DJANGO_ALLOWED_HOSTS=127.0.0.1
 MENU_DATA_DIR="$work/data"
 MENU_BIND_ADDRESS=127.0.0.1
 MENU_PORT=18765
+MENU_IMAGE=$run_id:app
 EOF
 docker_cmd compose --env-file "$work/compose.env" --project-directory "$work" \
     -f "$work/compose.yaml" -p "$run_id" config --quiet
@@ -226,4 +232,26 @@ PY
 then
     docker_cmd logs "$app"
     exit 1
+fi
+
+printf '\n== Verify a matching SQLite backup and restore ==\n'
+with_database "$tag" python - <<'PYBACKUP'
+import os
+import sqlite3
+
+with sqlite3.connect(os.environ["DJANGO_DB_PATH"]) as source, sqlite3.connect("/data/restored.sqlite3") as restored:
+    source.backup(restored)
+    assert restored.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    assert restored.execute("SELECT COUNT(*) FROM menus_dishrecord").fetchone() == (1,)
+    assert restored.execute("SELECT COUNT(*) FROM django_migrations").fetchone() == source.execute(
+        "SELECT COUNT(*) FROM django_migrations"
+    ).fetchone()
+print("Synthetic backup restored with its schema and seed.")
+PYBACKUP
+
+if "$keep_image"; then
+    candidate="menu-familiar:verified-$ref"
+    docker_cmd image tag "$tag" "$candidate"
+    printf 'Verified candidate: %s\n' "$candidate"
+    docker_cmd image inspect --format '{{.Id}}' "$candidate"
 fi

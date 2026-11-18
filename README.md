@@ -34,7 +34,7 @@ The test runner removes its test database. Without `DJANGO_TEST_DB_PATH`, these 
 
 ## Production configuration and release gates
 
-The provided Compose and Docker files are preliminary and have not yet passed image verification. Set an independent `DJANGO_SECRET_KEY`, comma-separated `DJANGO_ALLOWED_HOSTS`, an absolute private data directory in `MENU_DATA_DIR`, and an explicit trusted interface and port in `MENU_BIND_ADDRESS` and `MENU_PORT`; `.env.example` contains placeholders. Production requires an absolute `DJANGO_DB_PATH` and debug defaults off. The data directory must be writable by container UID 10001. Run migrations as a one-off before starting the app. `/healthz` reports database reachability without exposing data.
+The previous isolated Docker verification passed for commit `3782a0edd7c69c7adee77bb4cc5ac31294e471df`. Verify the candidate commit and record its image ID before using it. Set an independent `DJANGO_SECRET_KEY`, comma-separated `DJANGO_ALLOWED_HOSTS`, an absolute private data directory in `MENU_DATA_DIR`, and an explicit trusted interface and port in `MENU_BIND_ADDRESS` and `MENU_PORT`; `.env.example` contains placeholders. Production requires an absolute `DJANGO_DB_PATH` and debug defaults off. The data directory must be writable by container UID 10001. Run migrations as a one-off before starting the app. `/healthz` reports database reachability without exposing data.
 
 Use an allowlisted build context staged outside the source directory, containing only `Dockerfile`, `requirements.txt`, `manage.py`, `config/`, and the required Python, template and static files under `menus/`. Verify its contents before building; exclude private databases, CSV files, secrets, backups and logs. Do not bind to a public interface. Actual IPv4 and IPv6 isolation, guest-network denial, router forwards and any tunnels must be checked by the owner before release. No production deployment or unrelated service changes are authorized by this document.
 
@@ -47,6 +47,10 @@ sh scripts/verify-docker.sh
 ```
 
 Run this as your regular user from a terminal. The script requests sudo for Docker and Compose and writes the log as your regular user. The script verifies the current commit. It builds from an allowlisted temporary context, checks Docker exclusions with synthetic markers, validates the Compose configuration, and runs migrations and Gunicorn smoke checks using a disposable volume. It publishes no host ports and removes its test resources at the end. The latest completed run is saved to the ignored `logs/docker-verification.log`, including failures and the commit tested. This run does not verify network isolation on the household LAN.
+
+## Browser regression checks
+
+Install Playwright and Chromium in a QA environment using `python -m pip install playwright` and `python -m playwright install chromium`. Then run `python scripts/verify-browser.py` from the checkout. It starts a disposable loopback server, creates a fresh synthetic SQLite database, and runs the browser with JavaScript disabled. Playwright is a QA tool and is excluded from the runtime image.
 
 ## SQLite backup rehearsal
 
@@ -76,7 +80,19 @@ with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as source_db:
 PYBACKUP
 ```
 
-Restore to a separate location, verify compatible migrations and representative synthetic records, then seek owner authorization before any production switch. Rolling back code after an incompatible migration may also require a matching backup.
+Restore to a separate location and verify compatible migrations and representative records.
+
+For an owner-authorized release, verify the candidate from its committed source using `sh scripts/verify-docker.sh --keep-image`. Use the exact candidate tag and record the reported image ID with the matching pre-migration backup. Compose uses that image. It does not build from the checkout. With the owner-approved private environment file and backup prepared:
+
+```sh
+export MENU_IMAGE='menu-familiar:verified-REPLACE_WITH_VERIFIED_COMMIT'
+docker compose --env-file /absolute/path/to/private-menu.env config --quiet
+docker compose --env-file /absolute/path/to/private-menu.env stop menu-familiar
+docker compose --env-file /absolute/path/to/private-menu.env run --rm --no-deps menu-familiar python manage.py migrate --noinput
+docker compose --env-file /absolute/path/to/private-menu.env up -d --no-build menu-familiar
+```
+
+Replace the example tag with the verified tag. For rollback, stop only `menu-familiar`, keep the failed candidate database for investigation, and restore the matching backup into a new private data directory. Verify the copy with `PRAGMA integrity_check` and the previous image with `python manage.py migrate --check`. Set `MENU_IMAGE` and `MENU_DATA_DIR` to the matched pair, then use the same `up -d --no-build` command and check `/healthz`. The owner must verify actual trusted and untrusted IPv4 and IPv6 access separately.
 
 ## Consolidated manual owner QA (pending)
 
