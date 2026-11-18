@@ -20,3 +20,14 @@ staticfiles/
 
 # IDE configuration
 .idea/
+
+# Private UX and local working files
+/private-ux/
+/local-analysis/
+/review-drafts/
+/logs/
+*.log
+*.log.*
+/local-progress.md
+/TECHNICAL-REVIEW.md
+/TECHNICAL-REVIEW-*.md

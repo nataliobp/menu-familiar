@@ -1,0 +1,847 @@
+{
+  "status": "consolidated-v1",
+  "demo_current_week": "2026-11-16",
+  "demo_local_date": "2026-11-18",
+  "states": [
+    {
+      "id": "M01",
+      "group": "Menú setmanal",
+      "title": "Setmana actual",
+      "kind": "Habitual",
+      "ucs": [
+        "F01-UC02"
+      ],
+      "setup": "menu",
+      "steps": "Consulta els 14 àpats i obre un plat."
+    },
+    {
+      "id": "M02",
+      "group": "Menú setmanal",
+      "title": "Setmana en mòbil",
+      "kind": "Habitual",
+      "ucs": [
+        "F01-UC02"
+      ],
+      "setup": "menu",
+      "steps": "Canvia el dispositiu a mòbil; desplaça’t pels dies."
+    },
+    {
+      "id": "M03",
+      "group": "Menú setmanal",
+      "title": "Navegació entre setmanes",
+      "kind": "Habitual",
+      "ucs": [
+        "F01-UC03"
+      ],
+      "setup": "menu",
+      "steps": "Fes servir les fletxes i torna a Avui."
+    },
+    {
+      "id": "M04",
+      "group": "Menú setmanal",
+      "title": "Setmana futura sense menú",
+      "kind": "Buit",
+      "ucs": [
+        "F01-UC01",
+        "F01-UC03"
+      ],
+      "setup": "future",
+      "steps": "Crea el menú; els 14 buits copien la plantilla."
+    },
+    {
+      "id": "M05",
+      "group": "Menú setmanal",
+      "title": "Setmana passada amb menú",
+      "kind": "Només consulta",
+      "ucs": [
+        "F01-UC02",
+        "F01-UC03"
+      ],
+      "setup": "past",
+      "steps": "Obre un plat i la compra; no hi ha accions d’edició."
+    },
+    {
+      "id": "M06",
+      "group": "Menú setmanal",
+      "title": "Setmana passada sense menú",
+      "kind": "Buit",
+      "ucs": [
+        "F01-UC03"
+      ],
+      "setup": "pastMissing",
+      "steps": "No hi ha botó per crear una setmana passada."
+    },
+    {
+      "id": "M07",
+      "group": "Menú setmanal",
+      "title": "Nom llarg i setmana parcial",
+      "kind": "Límit",
+      "ucs": [
+        "F01-UC02"
+      ],
+      "setup": "long",
+      "steps": "Consulta el nom complet obrint el plat."
+    },
+    {
+      "id": "M08",
+      "group": "Menú setmanal",
+      "title": "Menú acabat de crear",
+      "kind": "Buit",
+      "ucs": [
+        "F01-UC01"
+      ],
+      "setup": "empty",
+      "steps": "Tria plats en els buits pendents."
+    },
+    {
+      "id": "M09",
+      "group": "Menú setmanal",
+      "title": "Setmana del canvi d’any",
+      "kind": "Límit",
+      "ucs": [
+        "F01-UC03"
+      ],
+      "setup": "year",
+      "steps": "Navega al gener amb les fletxes."
+    },
+    {
+      "id": "P01",
+      "group": "Tria de plats",
+      "title": "Suggeriments de la plantilla",
+      "kind": "Habitual",
+      "ucs": [
+        "F03-UC01",
+        "F02-UC01"
+      ],
+      "setup": "picker",
+      "steps": "Tria un plat de la categoria suggerida."
+    },
+    {
+      "id": "P02",
+      "group": "Tria de plats",
+      "title": "Cerca pel nom",
+      "kind": "Habitual",
+      "ucs": [
+        "F03-UC02"
+      ],
+      "setup": "search",
+      "steps": "Escriu o esborra el text de cerca."
+    },
+    {
+      "id": "P03",
+      "group": "Tria de plats",
+      "title": "Tots els plats",
+      "kind": "Habitual",
+      "ucs": [
+        "F03-UC03",
+        "F02-UC01"
+      ],
+      "setup": "all",
+      "steps": "Tria qualsevol plat, encara que no coincideixi amb la preferència."
+    },
+    {
+      "id": "P04",
+      "group": "Tria de plats",
+      "title": "Categoria sense plats",
+      "kind": "Buit",
+      "ucs": [
+        "F03-UC01",
+        "F03-UC03"
+      ],
+      "setup": "noCat",
+      "steps": "Mostra tots els plats o canvia la categoria."
+    },
+    {
+      "id": "P05",
+      "group": "Tria de plats",
+      "title": "Cerca sense resultats",
+      "kind": "Buit",
+      "ucs": [
+        "F03-UC02"
+      ],
+      "setup": "noSearch",
+      "steps": "Neteja la cerca sense sortir del selector."
+    },
+    {
+      "id": "P06",
+      "group": "Tria de plats",
+      "title": "Ordre de suggeriments",
+      "kind": "Límit",
+      "ucs": [
+        "F03-UC01",
+        "F03-UC03"
+      ],
+      "setup": "rank",
+      "steps": "Compara els plats ordinaris i d’ocasió especial; els arxivats no hi apareixen."
+    },
+    {
+      "id": "P07",
+      "group": "Tria de plats",
+      "title": "Buit sense suggeriment",
+      "kind": "Límit",
+      "ucs": [
+        "F02-UC01",
+        "F03-UC03"
+      ],
+      "setup": "freePicker",
+      "steps": "La tria comença amb totes les categories."
+    },
+    {
+      "id": "P08",
+      "group": "Tria de plats",
+      "title": "Plat desat",
+      "kind": "Èxit",
+      "ucs": [
+        "F02-UC01"
+      ],
+      "setup": "assigned",
+      "steps": "Reobre el plat del menú."
+    },
+    {
+      "id": "P09",
+      "group": "Tria de plats",
+      "title": "Canvia un plat",
+      "kind": "Habitual",
+      "ucs": [
+        "F02-UC02"
+      ],
+      "setup": "replace",
+      "steps": "Tria un altre plat o cancel·la; l’original es conserva fins a desar."
+    },
+    {
+      "id": "S01",
+      "group": "Planificació i canvis",
+      "title": "Fitxa i accions del menú",
+      "kind": "Habitual",
+      "ucs": [
+        "F02-UC02",
+        "F02-UC03",
+        "F02-UC04",
+        "F02-UC05",
+        "F02-UC06",
+        "F06-UC01"
+      ],
+      "setup": "slot",
+      "steps": "Obre les accions del plat i l’editor de recepta en una setmana editable."
+    },
+    {
+      "id": "S02",
+      "group": "Planificació i canvis",
+      "title": "Retira un plat",
+      "kind": "Decisió",
+      "ucs": [
+        "F02-UC03"
+      ],
+      "setup": "remove",
+      "steps": "Confirma o cancel·la; el buit torna a pendent."
+    },
+    {
+      "id": "S03",
+      "group": "Planificació i canvis",
+      "title": "Omet un àpat pendent",
+      "kind": "Decisió",
+      "ucs": [
+        "F02-UC04"
+      ],
+      "setup": "picker",
+      "steps": "Prem Omet aquest àpat."
+    },
+    {
+      "id": "S04",
+      "group": "Planificació i canvis",
+      "title": "Omet un àpat seleccionat",
+      "kind": "Decisió",
+      "ucs": [
+        "F02-UC04"
+      ],
+      "setup": "skipConfirm",
+      "steps": "Confirma la retirada i omissió."
+    },
+    {
+      "id": "S05",
+      "group": "Planificació i canvis",
+      "title": "Àpat omès",
+      "kind": "Habitual",
+      "ucs": [
+        "F02-UC04"
+      ],
+      "setup": "skipped",
+      "steps": "Torna a planificar; no es recupera l’antic plat."
+    },
+    {
+      "id": "S06",
+      "group": "Planificació i canvis",
+      "title": "Tria la destinació",
+      "kind": "Habitual",
+      "ucs": [
+        "F02-UC05",
+        "F02-UC06"
+      ],
+      "setup": "move",
+      "steps": "Tria un buit pendent o un altre plat."
+    },
+    {
+      "id": "S07",
+      "group": "Planificació i canvis",
+      "title": "Intercanvi completat",
+      "kind": "Èxit",
+      "ucs": [
+        "F02-UC06",
+        "F02-UC07"
+      ],
+      "setup": "exchanged",
+      "steps": "Els plats canvien de posició; Desfés restaura els dos."
+    },
+    {
+      "id": "S08",
+      "group": "Planificació i canvis",
+      "title": "Moviment completat",
+      "kind": "Èxit",
+      "ucs": [
+        "F02-UC05",
+        "F02-UC07"
+      ],
+      "setup": "moved",
+      "steps": "L’origen és pendent. Desfés restaura les posicions."
+    },
+    {
+      "id": "S09",
+      "group": "Planificació i canvis",
+      "title": "Destinació omesa",
+      "kind": "Decisió",
+      "ucs": [
+        "F02-UC05"
+      ],
+      "setup": "moveSkipped",
+      "steps": "Confirma la substitució de l’omissió o cancel·la."
+    },
+    {
+      "id": "S10",
+      "group": "Planificació i canvis",
+      "title": "Desfer el canvi",
+      "kind": "Èxit",
+      "ucs": [
+        "F02-UC07"
+      ],
+      "setup": "undo",
+      "steps": "Comprova la restauració; no hi ha un segon Desfés."
+    },
+    {
+      "id": "S11",
+      "group": "Planificació i canvis",
+      "title": "Desfer ja no disponible",
+      "kind": "Límit",
+      "ucs": [
+        "F02-UC07"
+      ],
+      "setup": "undoInvalid",
+      "steps": "Una edició posterior invalida Desfés."
+    },
+    {
+      "id": "S12",
+      "group": "Planificació i canvis",
+      "title": "Error durant el moviment",
+      "kind": "Error",
+      "ucs": [
+        "F02-UC05",
+        "F02-UC06"
+      ],
+      "setup": "moveError",
+      "steps": "No s’ha desat cap canvi; torna a triar la destinació."
+    },
+    {
+      "id": "T01",
+      "group": "Plantilla",
+      "title": "Plantilla setmanal",
+      "kind": "Habitual",
+      "ucs": [
+        "F04-UC01"
+      ],
+      "setup": "template",
+      "steps": "Consulta les 14 categories sense plats assignats."
+    },
+    {
+      "id": "T02",
+      "group": "Plantilla",
+      "title": "Canvia la categoria",
+      "kind": "Habitual",
+      "ucs": [
+        "F04-UC02"
+      ],
+      "setup": "templateEdit",
+      "steps": "Tria una categoria i desa només la posició."
+    },
+    {
+      "id": "T03",
+      "group": "Plantilla",
+      "title": "Deixa un àpat lliure",
+      "kind": "Decisió",
+      "ucs": [
+        "F04-UC03"
+      ],
+      "setup": "templateFree",
+      "steps": "Tria Lliure i desa."
+    },
+    {
+      "id": "T04",
+      "group": "Plantilla",
+      "title": "Plantilla actualitzada",
+      "kind": "Èxit",
+      "ucs": [
+        "F04-UC02",
+        "F04-UC03"
+      ],
+      "setup": "templateSaved",
+      "steps": "Torna al menú; els suggeriments copiats no han canviat."
+    },
+    {
+      "id": "D01",
+      "group": "Catàleg de plats",
+      "title": "Catàleg actiu",
+      "kind": "Habitual",
+      "ucs": [
+        "F05-UC01"
+      ],
+      "setup": "catalogue",
+      "steps": "Filtra o obre una fitxa de plat."
+    },
+    {
+      "id": "D02",
+      "group": "Catàleg de plats",
+      "title": "Cerca al catàleg",
+      "kind": "Habitual",
+      "ucs": [
+        "F05-UC02"
+      ],
+      "setup": "catalogueSearch",
+      "steps": "Escriu text per cercar."
+    },
+    {
+      "id": "D03",
+      "group": "Catàleg de plats",
+      "title": "Catàleg sense resultats",
+      "kind": "Buit",
+      "ucs": [
+        "F05-UC02"
+      ],
+      "setup": "catalogueEmpty",
+      "steps": "Neteja la cerca."
+    },
+    {
+      "id": "D04",
+      "group": "Catàleg de plats",
+      "title": "Nou plat",
+      "kind": "Habitual",
+      "ucs": [
+        "F05-UC03"
+      ],
+      "setup": "dishNew",
+      "steps": "Introdueix nom, categories i preferència; desa."
+    },
+    {
+      "id": "D05",
+      "group": "Catàleg de plats",
+      "title": "Dades del plat no vàlides",
+      "kind": "Error",
+      "ucs": [
+        "F05-UC03",
+        "F05-UC04"
+      ],
+      "setup": "dishInvalid",
+      "steps": "Corregeix el camp destacat; conserva la resta."
+    },
+    {
+      "id": "D06",
+      "group": "Catàleg de plats",
+      "title": "Edita un plat",
+      "kind": "Habitual",
+      "ucs": [
+        "F05-UC04"
+      ],
+      "setup": "dishEdit",
+      "steps": "Canvia les dades i comprova el menú actual."
+    },
+    {
+      "id": "D07",
+      "group": "Catàleg de plats",
+      "title": "Arxiva un plat",
+      "kind": "Decisió",
+      "ucs": [
+        "F05-UC05"
+      ],
+      "setup": "archive",
+      "steps": "Confirma; les assignacions existents es conserven."
+    },
+    {
+      "id": "D08",
+      "group": "Catàleg de plats",
+      "title": "Plats arxivats",
+      "kind": "Habitual",
+      "ucs": [
+        "F05-UC01",
+        "F05-UC06"
+      ],
+      "setup": "archived",
+      "steps": "Obre un arxivat i restaura’l."
+    },
+    {
+      "id": "D09",
+      "group": "Catàleg de plats",
+      "title": "Restaura un plat",
+      "kind": "Decisió",
+      "ucs": [
+        "F05-UC06"
+      ],
+      "setup": "restore",
+      "steps": "Confirma; torna a ser seleccionable."
+    },
+    {
+      "id": "D10",
+      "group": "Catàleg de plats",
+      "title": "Cap plat arxivat",
+      "kind": "Buit",
+      "ucs": [
+        "F05-UC01"
+      ],
+      "setup": "archivedEmpty",
+      "steps": "Torna a Plats actius."
+    },
+    {
+      "id": "R01",
+      "group": "Receptes",
+      "title": "Recepta publicada",
+      "kind": "Habitual",
+      "ucs": [
+        "F06-UC01"
+      ],
+      "setup": "recipe",
+      "steps": "Consulta ingredients per a 2 adults i preparació."
+    },
+    {
+      "id": "R02",
+      "group": "Receptes",
+      "title": "Recepta pendent",
+      "kind": "Buit",
+      "ucs": [
+        "F06-UC01",
+        "F06-UC02"
+      ],
+      "setup": "recipeMissing",
+      "steps": "No hi ha quantitats inventades; obre l’editor."
+    },
+    {
+      "id": "R03",
+      "group": "Receptes",
+      "title": "Edita la recepta",
+      "kind": "Habitual",
+      "ucs": [
+        "F06-UC02"
+      ],
+      "setup": "recipeEdit",
+      "steps": "Afegeix o retira ingredients i edita la preparació."
+    },
+    {
+      "id": "R04",
+      "group": "Receptes",
+      "title": "Ingredient al gust",
+      "kind": "Límit",
+      "ucs": [
+        "F06-UC02"
+      ],
+      "setup": "taste",
+      "steps": "Marca Al gust; quantitat i unitat no són aplicables."
+    },
+    {
+      "id": "R05",
+      "group": "Receptes",
+      "title": "Quantitat incorrecta",
+      "kind": "Error",
+      "ucs": [
+        "F06-UC02",
+        "F06-UC03"
+      ],
+      "setup": "recipeInvalid",
+      "steps": "Corregeix la quantitat negativa; conserva el formulari."
+    },
+    {
+      "id": "R06",
+      "group": "Receptes",
+      "title": "Esborrany desat",
+      "kind": "Èxit",
+      "ucs": [
+        "F06-UC03"
+      ],
+      "setup": "draftSaved",
+      "steps": "Consulta el contingut provisional i comprova la quantitat pendent."
+    },
+    {
+      "id": "R07",
+      "group": "Receptes",
+      "title": "Publicació incompleta",
+      "kind": "Error",
+      "ucs": [
+        "F06-UC04"
+      ],
+      "setup": "publishInvalid",
+      "steps": "Completa preparació i ingredients abans de publicar."
+    },
+    {
+      "id": "R08",
+      "group": "Receptes",
+      "title": "Recepta publicada correctament",
+      "kind": "Èxit",
+      "ucs": [
+        "F06-UC04"
+      ],
+      "setup": "published",
+      "steps": "Consulta la versió efectiva."
+    },
+    {
+      "id": "R09",
+      "group": "Receptes",
+      "title": "Canvis encara no publicats",
+      "kind": "Límit",
+      "ucs": [
+        "F06-UC01",
+        "F06-UC03",
+        "F06-UC04"
+      ],
+      "setup": "unpublished",
+      "steps": "La fitxa efectiva no canvia fins a publicar."
+    },
+    {
+      "id": "R10",
+      "group": "Receptes",
+      "title": "Recepta històrica",
+      "kind": "Només consulta",
+      "ucs": [
+        "F06-UC01"
+      ],
+      "setup": "pastRecipe",
+      "steps": "Consulta el contingut desat de la setmana passada."
+    },
+    {
+      "id": "C01",
+      "group": "Llista de la compra",
+      "title": "Compra setmanal parcial",
+      "kind": "Habitual",
+      "ucs": [
+        "F07-UC01"
+      ],
+      "setup": "shopping",
+      "steps": "Consulta avisos, ingredients, ajustos i productes manuals."
+    },
+    {
+      "id": "C02",
+      "group": "Llista de la compra",
+      "title": "Llista d’una setmana buida",
+      "kind": "Buit",
+      "ucs": [
+        "F07-UC01",
+        "F07-UC02"
+      ],
+      "setup": "shopEmpty",
+      "steps": "Afegeix un producte manual encara que no hi hagi plats."
+    },
+    {
+      "id": "C03",
+      "group": "Llista de la compra",
+      "title": "Afegeix un producte",
+      "kind": "Habitual",
+      "ucs": [
+        "F07-UC02"
+      ],
+      "setup": "manualAdd",
+      "steps": "Desa un extra amb quantitat i unitat o sense totes dues."
+    },
+    {
+      "id": "C04",
+      "group": "Llista de la compra",
+      "title": "Edita un producte manual",
+      "kind": "Habitual",
+      "ucs": [
+        "F07-UC02"
+      ],
+      "setup": "manualEdit",
+      "steps": "Modifica la quantitat; el marcatge es conserva."
+    },
+    {
+      "id": "C05",
+      "group": "Llista de la compra",
+      "title": "Elimina un producte manual",
+      "kind": "Decisió",
+      "ucs": [
+        "F07-UC02"
+      ],
+      "setup": "manualRemove",
+      "steps": "Confirma l’eliminació de l’extra, no dels ingredients."
+    },
+    {
+      "id": "C06",
+      "group": "Llista de la compra",
+      "title": "Ajusta quantitat calculada",
+      "kind": "Habitual",
+      "ucs": [
+        "F07-UC03"
+      ],
+      "setup": "adjust",
+      "steps": "Introdueix una quantitat positiva i conserva la base visible."
+    },
+    {
+      "id": "C07",
+      "group": "Llista de la compra",
+      "title": "Ajust i restabliment",
+      "kind": "Èxit",
+      "ucs": [
+        "F07-UC03"
+      ],
+      "setup": "adjusted",
+      "steps": "Obre Ajusta i prem Restableix per tornar a la quantitat calculada."
+    },
+    {
+      "id": "C08",
+      "group": "Llista de la compra",
+      "title": "Ajust sense ingredient calculat",
+      "kind": "Límit",
+      "ucs": [
+        "F07-UC03"
+      ],
+      "setup": "orphan",
+      "steps": "Revisa o descarta explícitament l’ajust."
+    },
+    {
+      "id": "C09",
+      "group": "Llista de la compra",
+      "title": "Unitats incompatibles i al gust",
+      "kind": "Límit",
+      "ucs": [
+        "F07-UC01",
+        "F07-UC03"
+      ],
+      "setup": "shopping",
+      "steps": "Pes i unitats apareixen en files diferents; Al gust no és ajustable."
+    },
+    {
+      "id": "C10",
+      "group": "Llista de la compra",
+      "title": "Productes comprats",
+      "kind": "Èxit",
+      "ucs": [
+        "F07-UC04"
+      ],
+      "setup": "checked",
+      "steps": "Marca i desmarca; navega i torna a la compra."
+    },
+    {
+      "id": "C11",
+      "group": "Llista de la compra",
+      "title": "Tots els àpats omesos",
+      "kind": "Buit",
+      "ucs": [
+        "F07-UC01"
+      ],
+      "setup": "shopSkipped",
+      "steps": "No hi ha avís de buits pendents ni ingredients calculats."
+    },
+    {
+      "id": "C12",
+      "group": "Llista de la compra",
+      "title": "Compra històrica",
+      "kind": "Només consulta",
+      "ucs": [
+        "F07-UC01"
+      ],
+      "setup": "shopPast",
+      "steps": "No es poden editar quantitats ni marcar productes."
+    },
+    {
+      "id": "C13",
+      "group": "Llista de la compra",
+      "title": "Setmana sense menú a la compra",
+      "kind": "Buit",
+      "ucs": [
+        "F07-UC01"
+      ],
+      "setup": "shopMissing",
+      "steps": "Ves al menú per crear la setmana abans d’afegir extres."
+    },
+    {
+      "id": "X01",
+      "group": "Errors i recuperació",
+      "title": "Formulari amb canvis sense desar",
+      "kind": "Decisió",
+      "ucs": [
+        "F06-UC02"
+      ],
+      "setup": "dirty",
+      "steps": "Continua editant o descarta els canvis."
+    },
+    {
+      "id": "X02",
+      "group": "Errors i recuperació",
+      "title": "Edició concurrent",
+      "kind": "Error",
+      "ucs": [
+        "F06-UC03",
+        "F05-UC04"
+      ],
+      "setup": "conflict",
+      "steps": "Compara la versió desada amb els teus canvis abans de tornar a enviar el formulari."
+    },
+    {
+      "id": "X03",
+      "group": "Errors i recuperació",
+      "title": "Servidor no disponible",
+      "kind": "Error",
+      "ucs": [
+        "F01-UC02"
+      ],
+      "setup": "offline",
+      "steps": "Reintenta quan el servidor estigui disponible."
+    },
+    {
+      "id": "X04",
+      "group": "Errors i recuperació",
+      "title": "Carregant dades",
+      "kind": "Espera",
+      "ucs": [
+        "F01-UC02"
+      ],
+      "setup": "loading",
+      "steps": "Exemple de progrés opcional mentre hi ha una petició en curs."
+    },
+    {
+      "id": "X05",
+      "group": "Errors i recuperació",
+      "title": "Error en desar el formulari",
+      "kind": "Error",
+      "ucs": [
+        "F06-UC03"
+      ],
+      "setup": "saveError",
+      "steps": "Simula un primer desament fallit i reintenta amb els mateixos camps."
+    },
+    {
+      "id": "X06",
+      "group": "Errors i recuperació",
+      "title": "Element no trobat",
+      "kind": "Error",
+      "ucs": [
+        "F05-UC01"
+      ],
+      "setup": "notFound",
+      "steps": "Torna al catàleg."
+    },
+    {
+      "id": "X07",
+      "group": "Errors i recuperació",
+      "title": "Acció no permesa en setmana passada",
+      "kind": "Error",
+      "ucs": [
+        "F01-UC03"
+      ],
+      "setup": "pastError",
+      "steps": "Mostra la prohibició; conserva la setmana en consulta."
+    }
+  ]
+}
