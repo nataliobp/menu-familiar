@@ -29,3 +29,11 @@ class TemplateWebTests(TestCase):
         self.assertEqual(self.client.post(url, {"version": 1, "category": "unknown"}).status_code, 400)
         TemplateSlotRecord.objects.first().delete()
         self.assertEqual(self.client.get(reverse("weekly_template")).status_code, 503)
+
+    def test_invalid_submission_preserves_choice_and_token(self):
+        url = reverse("template_edit", args=[0, "lunch"])
+        response = self.client.post(url, {"version": "invalid", "category": "cereals"})
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, 'value="invalid"', status_code=400)
+        self.assertContains(response, 'value="cereals" selected', status_code=400)
+        self.assertEqual(WeeklyTemplateRecord.objects.get().version, 1)

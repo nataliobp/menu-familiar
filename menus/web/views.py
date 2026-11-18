@@ -34,9 +34,11 @@ def template_edit(request, day, meal):
     try:
         template, categories = get_template(repo)
         selected = template.slots[(day, meal)] or ""
+        version_value = str(template.version)
         error = None
         status = 200
         if request.method == "POST":
+            version_value = request.POST.get("version", "")
             choices = request.POST.getlist("category")
             selected = choices[0] if len(choices) == 1 else ""
             try:
@@ -50,7 +52,7 @@ def template_edit(request, day, meal):
                 error, status = "Selecciona una categoria vàlida.", 400
             except TemplateConflict:
                 error, status = "La plantilla ha canviat. Revisa la selecció i torna-ho a provar.", 409
-        return render(request, "menus/template_edit.html", {"day": DAYS[day], "meal": MEALS[meal], "categories": categories.items(), "selected": selected, "selected_label": categories.get(selected, "Lliure"), "current_label": categories.get(template.slots[(day, meal)], "Lliure"), "version": template.version, "error": error}, status=status)
+        return render(request, "menus/template_edit.html", {"day": DAYS[day], "meal": MEALS[meal], "categories": categories.items(), "selected": selected, "selected_label": categories.get(selected, "Lliure"), "current_label": categories.get(template.slots[(day, meal)], "Lliure"), "version": version_value, "error": error, "conflict": status == 409}, status=status)
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
