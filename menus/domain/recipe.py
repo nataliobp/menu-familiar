@@ -31,7 +31,7 @@ def recipe_content(preparation, lines, publish=False):
         name = normalize_label(line.get("name", ""))
         unit, quantity = line.get("unit", ""), line.get("quantity", "").strip()
         note, taste = line.get("note", ""), line.get("taste", False)
-        if not name or len(name) > 120 or len(note) > 500 or unit not in UNITS | {""} or type(taste) is not bool:
+        if not name or len(note) > 500 or unit not in UNITS | {""} or type(taste) is not bool:
             raise ValueError("Invalid ingredient")
         if taste and (unit or quantity):
             raise ValueError("Invalid taste ingredient")

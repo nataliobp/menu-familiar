@@ -110,9 +110,9 @@ class ShoppingStateRecord(models.Model):
 
 class GeneratedOverlayRecord(models.Model):
     shopping = models.ForeignKey(ShoppingStateRecord, on_delete=models.CASCADE, related_name="overlays")
-    ingredient_key = models.CharField(max_length=255)
+    ingredient_key = models.TextField()
     family = models.CharField(max_length=5)
-    last_name = models.CharField(max_length=120)
+    last_name = models.TextField()
     last_base_quantity = models.TextField(null=True)
     adjusted_quantity = models.TextField(null=True)
     checked = models.BooleanField(default=False)

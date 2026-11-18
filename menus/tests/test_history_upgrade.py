@@ -9,7 +9,7 @@ from menus.infrastructure.django_planning import DjangoPlanningRepository
 
 class HistoryUpgradeTests(TransactionTestCase):
     before = [("menus", "0007_reciperecord")]
-    after = [("menus", "0009_generatedoverlayrecord_overlay_family_valid_and_more")]
+    after = [("menus", "0010_alter_generatedoverlayrecord_ingredient_key_and_more")]
 
     def setUp(self):
         executor = MigrationExecutor(connection)
@@ -44,3 +44,40 @@ class HistoryUpgradeTests(TransactionTestCase):
         after = aggregate(DjangoPlanningRepository().get(self.week).slots)
         self.assertEqual(before, after)
         self.assertEqual(str(after[0][0]["quantity"]), "160.000")
+
+
+class OverlayUpgradeTests(TransactionTestCase):
+    before = [("menus", "0009_generatedoverlayrecord_overlay_family_valid_and_more")]
+    after = [("menus", "0010_alter_generatedoverlayrecord_ingredient_key_and_more")]
+
+    def setUp(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.before)
+        apps = executor.loader.project_state(self.before).apps
+        Menu = apps.get_model("menus", "WeeklyMenuRecord")
+        Slot = apps.get_model("menus", "MenuSlotRecord")
+        State = apps.get_model("menus", "ShoppingStateRecord")
+        Overlay = apps.get_model("menus", "GeneratedOverlayRecord")
+        Manual = apps.get_model("menus", "ManualShoppingItemRecord")
+        self.week = date(2020, 1, 6)
+        menu = Menu.objects.create(week_start=self.week, version=2, shopping_projection_version=1)
+        Slot.objects.bulk_create([Slot(weekly_menu=menu, day_index=day, meal=meal, state="pending")
+                                  for day in range(7) for meal in ("lunch", "dinner")])
+        state = State.objects.create(week=menu, version=3)
+        Overlay.objects.create(shopping=state, ingredient_key="arròs", family="g", last_name="Arròs",
+                               last_base_quantity="100.000", adjusted_quantity="150.000", checked=False)
+        Manual.objects.create(shopping=state, name="Pa", quantity="2.000", unit="unit", checked=True)
+
+    def tearDown(self):
+        MigrationExecutor(connection).migrate(self.after)
+        super().tearDown()
+
+    def test_frozen_shopping_state_survives_overlay_schema_upgrade(self):
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        before = DjangoShoppingRepository().read(self.week)
+        MigrationExecutor(connection).migrate(self.after)
+        after = DjangoShoppingRepository().read(self.week)
+        self.assertEqual(before, after)
+        self.assertEqual(after[1].manual_items[0].quantity, "2.000")
+        self.assertTrue(after[1].manual_items[0].checked)
+        self.assertEqual(after[-1][0].adjusted_quantity, "150.000")

@@ -248,3 +248,12 @@ class DishTests(TestCase):
         view = shopping.read(week)
         self.assertEqual(view[1].manual_items[0].name, "Pa")
         self.assertTrue(view[1].manual_items[0].checked)
+
+    def test_catalogue_search_is_accent_insensitive_and_deduplicated(self):
+        from django.urls import reverse
+        repo = DjangoDishRepository()
+        dish_id = create_dish(repo, DishInput("Cafè sintètic", "cereals", frozenset({"vegetables"}), "both", False), uuid4())
+        response = self.client.get(reverse("catalogue"), {"q": "CAFE", "category": "vegetables"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cafè sintètic", count=1)
+        self.assertContains(response, reverse("dish_detail", args=[dish_id]))

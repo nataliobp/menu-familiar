@@ -208,6 +208,8 @@ def menu_confirm(request, week, day, meal, action):
                     return HttpResponse("El contingut ha canviat. Actualitza la pàgina abans de tornar-ho a provar.", status=409)
             except ValueError:
                 return HttpResponse("Versió invàlida.", status=400)
+            if action == "skip" and menu.slots[(day, meal)].state in ("pending", "skipped"):
+                return menu_action(request, week.isoformat(), day, meal, action)
         return render(request, "menus/confirm.html", {"week": week, "day": day, "meal": meal, "action": action, "menu": menu})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()

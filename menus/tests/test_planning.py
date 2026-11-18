@@ -249,3 +249,25 @@ class PlanningTests(TestCase):
         self.assertEqual(self.client.get(url).status_code, 200)
         self.assertEqual(self.client.get(url).status_code, 200)
         self.assertFalse(ShoppingStateRecord.objects.exists())
+
+    def test_pending_slot_can_be_skipped_directly(self):
+        from unittest.mock import patch
+        from django.urls import reverse
+        create_menu(self.repo, self.clock, self.week)
+        url = reverse("confirm_skip", args=[self.week.isoformat(), 0, "lunch"])
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            response = self.client.post(url, {"version": 1})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "skipped")
+
+    def test_selected_skip_requires_explicit_confirmation(self):
+        from unittest.mock import patch
+        from django.urls import reverse
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        url = reverse("confirm_skip", args=[self.week.isoformat(), 0, "lunch"])
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            self.assertEqual(self.client.post(url, {"version": 2}).status_code, 200)
+            self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "selected")
+            self.assertEqual(self.client.post(url, {"version": 2, "confirm": "yes"}).status_code, 302)
+        self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "skipped")
