@@ -271,3 +271,15 @@ class PlanningTests(TestCase):
             self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "selected")
             self.assertEqual(self.client.post(url, {"version": 2, "confirm": "yes"}).status_code, 302)
         self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "skipped")
+
+    def test_recommendation_recency_includes_future_and_moves(self):
+        from menus.application.planning import move_or_undo
+        from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
+        future = self.week + timedelta(days=14)
+        create_menu(self.repo, self.clock, self.week)
+        create_menu(self.repo, self.clock, future)
+        change_menu(self.repo, self.clock, self.week, (6, "dinner"), 1, "assign", self.dish.pk)
+        change_menu(self.repo, self.clock, future, (0, "lunch"), 1, "assign", self.dish.pk)
+        self.assertEqual(DjangoCatalogueQueries().latest_dates()[self.dish.pk], future)
+        move_or_undo(self.repo, self.clock, future, 2, (0, "lunch"), (4, "dinner"))
+        self.assertEqual(DjangoCatalogueQueries().latest_dates()[self.dish.pk], future + timedelta(days=4))

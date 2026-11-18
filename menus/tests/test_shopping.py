@@ -37,3 +37,16 @@ class ShoppingTests(TestCase):
             parse_amount("1399999999998600.001", Decimal("1399999999998600.000"))
         with self.assertRaises(ValueError):
             recipe_content("Cou", [line] * 101, True)
+
+    def test_normalization_families_and_note_order(self):
+        content = recipe_content("Cou", [
+            {"name": "  CAFÈ  ", "quantity": "1", "unit": "g", "note": "z"},
+            {"name": "cafe\u0300", "quantity": "1", "unit": "unit", "note": "a"},
+            {"name": "cafè", "quantity": "2", "unit": "g", "note": "a"},
+            {"name": "cafe", "taste": True},
+        ], True)
+        slot = Slot(None, "selected", {"name": "Plat", "recipe_status": "published", "recipe_content": content})
+        rows, _, _ = aggregate({(0, "lunch"): slot})
+        self.assertEqual([row["key"] for row in rows], [("cafe", "taste"), ("cafè", "g"), ("cafè", "unit")])
+        self.assertEqual(rows[1]["quantity"], Decimal("3.000"))
+        self.assertEqual(rows[1]["notes"], ("a", "z"))

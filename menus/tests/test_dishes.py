@@ -257,3 +257,35 @@ class DishTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Cafè sintètic", count=1)
         self.assertContains(response, reverse("dish_detail", args=[dish_id]))
+
+    def test_corrupt_overlay_aborts_planning_write(self):
+        from menus.application.errors import DataIntegrityError
+        from menus.models import GeneratedOverlayRecord, ShoppingStateRecord
+        plans = DjangoPlanningRepository()
+        week = date(2026, 11, 16)
+        create_menu(plans, Clock(week), week)
+        state = ShoppingStateRecord.objects.create(week_id=week)
+        GeneratedOverlayRecord.objects.create(shopping=state, ingredient_key="arròs", family="g", last_name="Arròs", last_base_quantity="100.000", adjusted_quantity="1e3")
+        with self.assertRaises(DataIntegrityError):
+            change_menu(plans, Clock(week), week, (0, "lunch"), 1, "skip")
+        menu = plans.get(week)
+        self.assertEqual(menu.version, 1)
+        self.assertEqual(menu.slots[(0, "lunch")].state, "pending")
+
+    def test_maximum_override_survives_orphan_and_reappearance(self):
+        from menus.application.recipes import save_recipe
+        from menus.application.shopping import mutate_shopping
+        from menus.domain.recipe import recipe_content
+        from menus.infrastructure.django_shopping import DjangoShoppingRepository
+        dishes, plans, shopping = DjangoDishRepository(), DjangoPlanningRepository(), DjangoShoppingRepository()
+        week = date(2026, 11, 16)
+        dish_id = create_dish(dishes, DishInput("Plat sintètic", "cereals", frozenset(), "both", False), uuid4())
+        save_recipe(dishes, Clock(week), dish_id, 1, recipe_content("Cou", [{"name": "Arròs", "quantity": "1", "unit": "g"}], True), True)
+        create_menu(plans, Clock(week), week)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
+        maximum = "1399999999998600.000"
+        mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {"key": "arròs", "family": "g", "quantity": maximum})
+        change_menu(plans, Clock(week), week, (0, "lunch"), 2, "remove")
+        self.assertEqual(shopping.read(week)[-1][0].adjusted_quantity, maximum)
+        change_menu(plans, Clock(week), week, (0, "lunch"), 3, "assign", dish_id)
+        self.assertEqual(shopping.read(week)[2][0]["overlay"].adjusted_quantity, maximum)
