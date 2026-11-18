@@ -19,7 +19,7 @@ class CatalogueUpgradeTests(TransactionTestCase):
         if ("menus", "0002_catalogue_upgrade") not in executor.loader.applied_migrations:
             old_dish = self.old_apps.get_model("menus", "DishRecord")
             old_dish.objects.filter(primary_category="Unknown").delete()
-            executor.migrate(self.migrate_to)
+        executor.migrate(executor.loader.graph.leaf_nodes())
         super().tearDown()
 
     def test_populated_upgrade_preserves_fields_and_allocates_id(self):

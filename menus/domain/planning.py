@@ -91,9 +91,58 @@ class WeeklyMenu:
                      "eligible_version": self.version + 1}
         return True
 
+    def validate_undo(self):
+        undo = self.undo
+        if undo is None:
+            return
+        if not isinstance(undo, dict) or set(undo) != {"positions", "before", "after", "eligible_version"}:
+            raise ValueError("Invalid undo")
+        version = undo["eligible_version"]
+        if type(version) is not int or version != self.version or version < 3:
+            raise ValueError("Invalid undo version")
+        positions = undo["positions"]
+        if not isinstance(positions, list) or len(positions) != 2:
+            raise ValueError("Invalid undo positions")
+        for position in positions:
+            if (not isinstance(position, list) or len(position) != 2
+                    or type(position[0]) is not int or tuple(position) not in self.slots):
+                raise ValueError("Invalid undo position")
+        if positions[0] == positions[1]:
+            raise ValueError("Duplicate undo position")
+        before, after = undo["before"], undo["after"]
+        for image in (before, after):
+            if not isinstance(image, list) or len(image) != 2:
+                raise ValueError("Invalid undo image")
+            for pair in image:
+                if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                    raise ValueError("Invalid undo slot")
+                state, dish = pair
+                Slot(None, state, dish)
+                if dish is not None:
+                    identifier = dish.get("dish_id")
+                    if type(identifier) is not int or not 1 <= identifier <= 9223372036854775807:
+                        raise ValueError("Invalid undo dish")
+                    validate_snapshot(dish, identifier)
+        live = [self.slots[tuple(position)] for position in positions]
+        if [tuple(pair) for pair in after] != [(slot.state, slot.dish) for slot in live]:
+            raise ValueError("Undo does not match the menu")
+        first, second = map(tuple, before)
+        expected = [second, first] if second[0] == "selected" else [("pending", None), first]
+        if first[0] != "selected" or first == second or list(map(tuple, after)) != expected:
+            raise ValueError("Invalid undo transition")
+
+    def refresh_undo(self, changed_positions):
+        if self.undo is None:
+            return
+        if any(tuple(position) in changed_positions for position in self.undo["positions"]):
+            self.undo = None
+        else:
+            self.undo["eligible_version"] = self.version + 1
+
     def undo_change(self):
         if not self.undo or self.undo["eligible_version"] != self.version:
             raise ValueError("Undo unavailable")
+        self.validate_undo()
         positions = [tuple(position) for position in self.undo["positions"]]
         slots = [self.slots[position] for position in positions]
         if [[slot.state, slot.dish] for slot in slots] != [list(value) for value in self.undo["after"]]:

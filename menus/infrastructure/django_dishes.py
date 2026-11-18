@@ -54,11 +54,7 @@ class DjangoDishRepository:
                     slot.dish = snapshot.copy()
                     positions.append(position)
             if positions:
-                if menu.undo:
-                    if any(tuple(position) in positions for position in menu.undo["positions"]):
-                        menu.undo = None
-                    else:
-                        menu.undo["eligible_version"] = menu.version + 1
+                menu.refresh_undo(positions)
                 planning.save(menu, menu.version)
 
     def set_archived(self, dish_id, version, archived):

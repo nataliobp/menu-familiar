@@ -10,6 +10,20 @@ from menus.tests.test_planning import Clock
 
 
 class DishTests(TestCase):
+    def test_recipe_error_returns_to_editor_and_rejects_conflicting_intent(self):
+        from django.urls import reverse
+        dish_id = create_dish(DjangoDishRepository(), DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
+        publish = reverse("recipe_publish", args=[dish_id])
+        editor = reverse("recipe_edit", args=[dish_id])
+        data = {"action": "publish", "version": "1", "preparation": "", "name": "Arròs", "quantity": "", "unit": "g"}
+        response = self.client.post(publish, data)
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, f'action="{editor}"', status_code=400)
+        response = self.client.post(publish, {**data, "action": "review_discard"})
+        self.assertEqual(response.status_code, 400)
+        response = self.client.post(editor, {**data, "action": "review_discard"})
+        self.assertContains(response, f'action="{editor}"')
+
     def test_receipt_replay_and_conflict(self):
         repo = DjangoDishRepository()
         token = uuid4()

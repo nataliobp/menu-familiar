@@ -18,6 +18,7 @@ class DishView:
     special_occasion: bool
     archived: bool
     version: int
+    recipe_status: str = "missing"
 
     @property
     def pk(self):
@@ -51,8 +52,10 @@ def get_recipe(queries: CatalogueQueries, dish_id: int):
 
 def browse_dishes(queries: CatalogueQueries, archived: bool, category: str, query: str):
     from menus.domain.recommendations import search_key
-    return [dish for dish in queries.dishes(archived) if search_key(query) in search_key(dish.name)
-            and (not category or category in {dish.primary_category_id, *dish.secondary_categories})]
+    needle = search_key(query)
+    matches = (dish for dish in queries.dishes(archived) if needle in search_key(dish.name)
+               and (not category or category in {dish.primary_category_id, *dish.secondary_categories}))
+    return sorted(matches, key=lambda dish: (dish.name.casefold(), dish.id))
 
 
 def picker_dishes(queries: CatalogueQueries, meal: str, category: str | None, query: str):

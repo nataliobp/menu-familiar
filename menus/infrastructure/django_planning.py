@@ -39,7 +39,9 @@ class DjangoPlanningRepository:
             if row.dish_snapshot is not None:
                 validate_snapshot(row.dish_snapshot, row.dish_id)
             slots[(row.day_index, row.meal)] = Slot(suggestion, row.state, row.dish_snapshot)
-        return WeeklyMenu(root.week_start, root.version, slots, root.undo_payload)
+        menu = WeeklyMenu(root.week_start, root.version, slots, root.undo_payload)
+        menu.validate_undo()
+        return menu
 
     def create(self, menu):
         try:

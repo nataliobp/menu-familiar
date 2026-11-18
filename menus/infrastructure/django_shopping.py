@@ -1,6 +1,7 @@
 from decimal import Decimal
 from menus.domain.shopping import aggregate
 from menus.models import ShoppingStateRecord
+from menus.application.shopping import ShoppingConflict
 from menus.application.shopping_views import ManualItemView, OverlayView, ShoppingStateView
 from menus.application.errors import DataIntegrityError
 
@@ -32,10 +33,6 @@ def reconcile(menu):
     if changed:
         state.version += 1
         state.save(update_fields=["version"])
-
-
-class ShoppingConflict(Exception):
-    pass
 
 
 class DjangoShoppingRepository:
@@ -83,30 +80,16 @@ class DjangoShoppingRepository:
         state_view = ShoppingStateView(state.version, tuple(ManualItemView(item.pk, item.name, item.quantity, item.unit, item.checked) for item in state.manual_items.order_by("id"))) if state else None
         return menu, state_view, rows, pending, incomplete, list(overlays.values())
 
-    def manual_digest(self, week, data):
-        import hashlib, json
-        from uuid import UUID
-        from menus.domain.shopping import manual_item
-        name, quantity, unit = manual_item(data.get("name", ""), data.get("quantity", ""), data.get("unit", ""))
-        token = UUID(data.get("token", ""))
-        payload = {"operation": "manual_add", "scope": week.isoformat(), "name": name, "quantity": quantity, "unit": unit}
-        digest = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
-        return token, digest
-
-    def manual_replay(self, week, data):
+    def get_receipt(self, token):
         from menus.models import CreationReceipt
-        token, digest = self.manual_digest(week, data)
-        receipt = CreationReceipt.objects.filter(pk=token).first()
-        if receipt is None:
-            return None
-        if (receipt.operation, receipt.scope, receipt.digest) != ("manual_add", week.isoformat(), digest):
-            raise ShoppingConflict()
-        return receipt.result_id
+
+        return CreationReceipt.objects.filter(pk=token).values_list(
+            "operation", "scope", "digest", "result_id"
+        ).first()
 
     def mutate(self, week, menu_version, overlay_version, action, data):
         from menus.models import WeeklyMenuRecord, GeneratedOverlayRecord, ManualShoppingItemRecord
-        from menus.domain.recipe import parse_amount
-        from menus.domain.shopping import manual_item
+        from menus.domain.shopping import ORDER, desired_check, overlay_transition
         view = self.read(week)
         if view is None:
             raise ValueError("Missing menu")
@@ -124,11 +107,12 @@ class DjangoShoppingRepository:
                 raise ShoppingConflict()
             created = False
         changed = False
+        result = None
         if action == "manual_add":
-            name, quantity, unit = manual_item(data.get("name", ""), data.get("quantity", ""), data.get("unit", ""))
+            name, quantity, unit = data["values"]
             item = ManualShoppingItemRecord.objects.create(shopping=state, name=name, quantity=quantity, unit=unit)
             from menus.models import CreationReceipt
-            token, digest = self.manual_digest(week, data)
+            token, digest = data["receipt_token"], data["digest"]
             from django.db import IntegrityError
             from menus.application.dishes import DuplicateReceipt
             try:
@@ -136,6 +120,7 @@ class DjangoShoppingRepository:
             except IntegrityError as exc:
                 raise DuplicateReceipt() from exc
             changed = True
+            result = item.pk
         elif action in ("manual_edit", "manual_remove", "manual_check"):
             item = state.manual_items.filter(pk=data.get("id")).first()
             if not item:
@@ -144,15 +129,13 @@ class DjangoShoppingRepository:
                 item.delete()
                 changed = True
             elif action == "manual_edit":
-                values = manual_item(data.get("name", ""), data.get("quantity", ""), data.get("unit", ""))
+                values = data["values"]
                 changed = (item.name, item.quantity, item.unit) != values
                 if changed:
                     item.name, item.quantity, item.unit = values
                     item.save(update_fields=["name", "quantity", "unit"])
             else:
-                if data.get("checked") not in ("0", "1"):
-                    raise ValueError("Invalid check state")
-                checked = data.get("checked") == "1"
+                checked = desired_check(data)
                 changed = item.checked != checked
                 if changed:
                     item.checked = checked
@@ -161,48 +144,24 @@ class DjangoShoppingRepository:
             key = (data.get("key"), data.get("family"))
             row = next((row for row in rows if row["key"] == key), None)
             overlay = state.overlays.filter(ingredient_key=key[0], family=key[1]).first()
-            if action == "reset":
-                if overlay and overlay.adjusted_quantity is not None:
-                    if overlay.checked and row:
-                        overlay.adjusted_quantity = None
-                        overlay.save(update_fields=["adjusted_quantity"])
-                    else:
-                        overlay.delete()
-                    changed = True
-            else:
-                if not row:
-                    raise ValueError("Missing generated item")
-                amount = parse_amount(data.get("quantity", ""), Decimal("1399999999998600.000")) if action == "adjust" else None
-                if action == "adjust" and key[1] == "taste":
-                    raise ValueError("Cannot adjust taste")
-                if action == "check" and data.get("checked") not in ("0", "1"):
-                    raise ValueError("Invalid check state")
-                checked = data.get("checked") == "1"
-                if action == "adjust" and amount == format(row["quantity"], ".3f"):
-                    if overlay and overlay.adjusted_quantity is not None:
-                        if overlay.checked:
-                            overlay.adjusted_quantity = None
-                            overlay.save(update_fields=["adjusted_quantity"])
-                        else:
-                            overlay.delete()
-                        changed = True
-                elif overlay is None:
-                    if action == "check" and not checked:
-                        changed = False
-                    else:
-                        overlay = GeneratedOverlayRecord.objects.create(shopping=state, ingredient_key=key[0], family=key[1], last_name=row["name"], last_base_quantity=format(row["quantity"], ".3f") if row["quantity"] is not None else None, adjusted_quantity=amount, checked=checked if action == "check" else False)
-                        changed = True
-                elif action == "adjust" and overlay.adjusted_quantity != amount:
-                    overlay.adjusted_quantity = amount
-                    overlay.save(update_fields=["adjusted_quantity"])
-                    changed = True
-                elif action == "check" and overlay.checked != checked:
-                    overlay.checked = checked
-                    if not checked and overlay.adjusted_quantity is None:
-                        overlay.delete()
-                    else:
-                        overlay.save(update_fields=["checked"])
-                    changed = True
+            if not key[0] or key[1] not in ORDER or (row is None and overlay is None):
+                raise ValueError("Invalid generated item")
+            previous = (overlay.adjusted_quantity, overlay.checked) if overlay else None
+            updated = overlay_transition(action, data, row, previous)
+            changed = updated != previous
+            if changed and updated is None:
+                overlay.delete()
+            elif changed and overlay:
+                overlay.adjusted_quantity, overlay.checked = updated
+                overlay.save(update_fields=["adjusted_quantity", "checked"])
+            elif changed:
+                adjusted, checked = updated
+                GeneratedOverlayRecord.objects.create(
+                    shopping=state, ingredient_key=key[0], family=key[1],
+                    last_name=row["name"],
+                    last_base_quantity=format(row["quantity"], ".3f") if row["quantity"] is not None else None,
+                    adjusted_quantity=adjusted, checked=checked,
+                )
         else:
             raise ValueError("Invalid action")
         if not changed and created:
@@ -210,3 +169,4 @@ class DjangoShoppingRepository:
         elif changed and not created:
             state.version += 1
             state.save(update_fields=["version"])
+        return result

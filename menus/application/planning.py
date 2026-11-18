@@ -87,7 +87,12 @@ def move_or_undo(repo, clock, week, version, source=None, destination=None, conf
             raise ValueError("Missing menu")
         if menu.version != version:
             raise PlanningConflict()
-        if source is not None and operation in ("move", "exchange"):
+        if source is not None:
+            if source not in menu.slots or destination not in menu.slots:
+                raise ValueError("Invalid position")
+            if menu.slots[source].state != "selected":
+                raise ValueError("Source must be selected")
+        if source is not None and source != destination and operation in ("move", "exchange"):
             target_selected = menu.slots[destination].state == "selected"
             if target_selected != (operation == "exchange"):
                 raise ValueError("Invalid destination")

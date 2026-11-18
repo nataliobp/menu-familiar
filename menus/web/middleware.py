@@ -1,5 +1,5 @@
 from django.db import DatabaseError
-from django.http import HttpResponse
+from django.shortcuts import render
 from menus.application.errors import DataIntegrityError
 
 
@@ -12,5 +12,5 @@ class DataIntegrityMiddleware:
 
     def process_exception(self, request, exception):
         if isinstance(exception, (DataIntegrityError, DatabaseError)):
-            return HttpResponse("El servei no està disponible. Torna-ho a provar.", status=503)
+            return render(request, "503.html", status=503)
         return None

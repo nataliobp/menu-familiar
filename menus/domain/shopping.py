@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation, localcontext
 import re
-from menus.domain.recipe import normalize_label
+from menus.domain.recipe import normalize_label, parse_amount
 import unicodedata
 
 
@@ -72,3 +72,29 @@ def manual_item(name, quantity, unit):
     if not name or len(name) > 120 or bool(quantity) != bool(unit) or (unit and unit not in UNITS):
         raise ValueError("Invalid manual item")
     return name, parse_amount(quantity) if quantity else None, unit or None
+
+def overlay_transition(action, data, row, previous):
+    """Return the adjustment and check state to keep, or None to remove it."""
+    adjustment, checked = previous or (None, False)
+    if action == "reset":
+        if adjustment is None:
+            return previous
+        adjustment, checked = None, checked and row is not None
+    elif row is None:
+        raise ValueError("Missing generated item")
+    elif action == "adjust":
+        if row["quantity"] is None:
+            raise ValueError("Cannot adjust taste")
+        amount = parse_amount(data.get("quantity", ""), Decimal("1399999999998600.000"))
+        adjustment = None if amount == format(row["quantity"], ".3f") else amount
+    elif action == "check":
+        checked = desired_check(data)
+    else:
+        raise ValueError("Invalid operation")
+    return (adjustment, checked) if adjustment is not None or checked else None
+
+
+def desired_check(data):
+    if data.get("checked") not in ("0", "1"):
+        raise ValueError("Invalid check state")
+    return data["checked"] == "1"

@@ -22,3 +22,27 @@ textarea { width: min(100%, 48rem); min-height: 8rem; }
 fieldset { border: 1px solid #d9e1d7; border-radius: .7rem; margin: .7rem 0; }
 input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: #28664e; }
 .shopping-row { background: white; border: 1px solid #d9e1d7; border-radius: .65rem; padding: .75rem; margin: .5rem 0; overflow-wrap: anywhere; }
+
+header nav a[aria-current="page"] { background: #d7e7d8; }
+.week h2 abbr { display: none; text-decoration: none; }
+.week a.slot:hover { border-color: #28664e; }
+.week .slot strong, .week .slot small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.week .slot small { -webkit-line-clamp: 1; }
+.week .slot:focus-visible { border-color: #b26a20; }
+@media (min-width: 701px) and (max-width: 1024px) {
+  .week h2 { padding: .4rem .15rem; }
+  .week h2 abbr { display: inline; }
+  .week .full-day {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .week .slot { min-height: 5.5rem; padding: .35rem; font-size: .875rem; }
+}

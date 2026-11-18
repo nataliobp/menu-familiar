@@ -44,7 +44,7 @@ class PlanningTests(TestCase):
     def test_web_preview_creation_and_assignment(self):
         from unittest.mock import patch
         from django.urls import reverse
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             url = reverse("menu_week", args=[self.week.isoformat()])
             response = self.client.get(url)
             self.assertContains(response, "Crea el menú")
@@ -73,7 +73,7 @@ class PlanningTests(TestCase):
     def test_recipe_and_shopping_pages_render(self):
         from unittest.mock import patch
         from django.urls import reverse
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             create_menu(self.repo, self.clock, self.week)
             self.assertEqual(self.client.get(reverse("recipe_edit", args=[self.dish.pk])).status_code, 200)
             self.assertEqual(self.client.get(reverse("shopping_week", args=[self.week.isoformat()])).status_code, 200)
@@ -103,7 +103,7 @@ class PlanningTests(TestCase):
         create_menu(self.repo, self.clock, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         url = reverse("confirm_remove", args=[self.week.isoformat(), 0, "lunch"])
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             self.assertEqual(self.client.get(url).status_code, 200)
             self.assertEqual(self.client.post(url, {"version": 2}).status_code, 200)
             self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "selected")
@@ -129,7 +129,7 @@ class PlanningTests(TestCase):
         from django.urls import reverse
         create_menu(self.repo, self.clock, self.week)
         url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             response = self.client.post(url, {"menu_version": 1, "overlay_version": 0, "token": str(uuid4()), "name": "Producte sintètic", "quantity": "abc", "unit": "g"})
         self.assertEqual(response.status_code, 400)
         self.assertContains(response, "Producte sintètic", status_code=400)
@@ -138,7 +138,7 @@ class PlanningTests(TestCase):
     def test_recipe_publication_through_web_and_shopping_projection(self):
         from unittest.mock import patch
         from django.urls import reverse
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             create_menu(self.repo, self.clock, self.week)
             change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
             response = self.client.post(reverse("recipe_publish", args=[self.dish.pk]), {"version": 1, "preparation": "Coeu-ho", "name": ["Arròs"], "quantity": ["160"], "unit": ["g"], "note": [""]})
@@ -170,7 +170,7 @@ class PlanningTests(TestCase):
         token = str(uuid4())
         url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
         data = {"menu_version": 1, "overlay_version": 0, "token": token, "name": "Producte de prova", "quantity": "", "unit": ""}
-        with patch("menus.web.views.mutate_shopping", side_effect=OperationalError("synthetic lock")):
+        with patch("menus.web.shopping.mutate_shopping", side_effect=OperationalError("synthetic lock")):
             response = self.client.post(url, data)
         self.assertEqual(response.status_code, 503)
         self.assertContains(response, token, status_code=503)
@@ -179,7 +179,7 @@ class PlanningTests(TestCase):
     def test_recipe_conflict_shows_submitted_and_current_values(self):
         from unittest.mock import patch
         from django.urls import reverse
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             url = reverse("recipe_publish", args=[self.dish.pk])
             data = {"version": 1, "preparation": "Preparació actual", "name": ["Arròs"], "quantity": ["160"], "unit": ["g"], "note": [""]}
             self.assertEqual(self.client.post(url, data).status_code, 302)
@@ -220,7 +220,7 @@ class PlanningTests(TestCase):
         from django.urls import reverse
         token = str(uuid4())
         data = {"token": token, "name": "Plat de prova", "primary": "cereals", "preference": "both"}
-        with patch("menus.web.views.create_dish", side_effect=OperationalError("synthetic lock")):
+        with patch("menus.web.catalogue.create_dish", side_effect=OperationalError("synthetic lock")):
             response = self.client.post(reverse("dish_create"), data)
         self.assertEqual(response.status_code, 503)
         self.assertContains(response, token, status_code=503)
@@ -236,7 +236,7 @@ class PlanningTests(TestCase):
         row.dish_snapshot["schema_version"] = 999
         row.save(update_fields=["dish_snapshot"])
         url = reverse("menu_action", args=[self.week.isoformat(), 1, "lunch", "assign"])
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             response = self.client.post(url, {"version": 2, "dish": self.dish.pk})
         self.assertEqual(response.status_code, 503)
         self.assertEqual(WeeklyMenuRecord.objects.get(pk=self.week).version, 2)
@@ -255,7 +255,7 @@ class PlanningTests(TestCase):
         from django.urls import reverse
         create_menu(self.repo, self.clock, self.week)
         url = reverse("confirm_skip", args=[self.week.isoformat(), 0, "lunch"])
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             response = self.client.post(url, {"version": 1})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "skipped")
@@ -266,7 +266,7 @@ class PlanningTests(TestCase):
         create_menu(self.repo, self.clock, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         url = reverse("confirm_skip", args=[self.week.isoformat(), 0, "lunch"])
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             self.assertEqual(self.client.post(url, {"version": 2}).status_code, 200)
             self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "selected")
             self.assertEqual(self.client.post(url, {"version": 2, "confirm": "yes"}).status_code, 302)
@@ -307,7 +307,7 @@ class PlanningTests(TestCase):
         submission = {**destination, "source_day": 0, "source_meal": "lunch", "confirm": "yes"}
         client = Client(enforce_csrf_checks=True)
 
-        with patch("menus.web.views.MadridClock", return_value=self.clock):
+        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             self.assertContains(client.get(review_url), "Tria la destinació")
             response = client.get(review_url, destination)
             self.assertContains(response, "Aquest àpat està omès.")

@@ -1,0 +1,6 @@
+{% extends "menus/base.html" %}
+{% block content %}
+<h1>{% if invalid %}No s’ha pogut completar l’acció{% else %}El contingut ha canviat{% endif %}</h1>
+<p>Revisa el contingut actual abans de tornar a fer el canvi.</p>
+{% if week %}<a href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú de la setmana</a>{% else %}<a href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
+{% endblock %}
