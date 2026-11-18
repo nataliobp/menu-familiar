@@ -2,6 +2,7 @@ from decimal import Decimal
 from menus.domain.shopping import aggregate
 from menus.models import ShoppingStateRecord
 from menus.application.shopping_views import ManualItemView, OverlayView, ShoppingStateView
+from menus.application.errors import DataIntegrityError
 
 
 def reconcile(menu):
@@ -43,6 +44,12 @@ class DjangoShoppingRepository:
         return transaction.atomic()
 
     def read(self, week):
+        try:
+            return self._read(week)
+        except (ValueError, KeyError, TypeError, AttributeError, ArithmeticError) as exc:
+            raise DataIntegrityError("Invalid stored shopping data") from exc
+
+    def _read(self, week):
         from menus.infrastructure.django_planning import DjangoPlanningRepository
         menu = DjangoPlanningRepository().get(week)
         if menu is None:

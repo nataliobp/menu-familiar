@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from django.db import IntegrityError, transaction
 from menus.application.planning import DuplicateWeek, PlanningConflict
+from menus.application.errors import DataIntegrityError
 from menus.domain.planning import Slot, WeeklyMenu, validate_snapshot
 from menus.infrastructure.django_template import DjangoTemplateRepository
 from menus.models import DishRecord, MenuSlotRecord, WeeklyMenuRecord, RecipeRecord
@@ -21,6 +22,12 @@ class DjangoPlanningRepository:
         return repo.get(), repo.categories()
 
     def get(self, week):
+        try:
+            return self._get(week)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise DataIntegrityError("Invalid stored menu") from exc
+
+    def _get(self, week):
         root = WeeklyMenuRecord.objects.filter(pk=week).first()
         if root is None:
             return None
@@ -73,5 +80,8 @@ class DjangoPlanningRepository:
                 "secondary_categories": [{"key": key, "name": name} for key, name in dish.secondary_categories.order_by("category_id").values_list("category_id", "category__name_ca")],
                 "meal_preference": dish.meal_preference, "special_occasion": dish.special_occasion,
                 "recipe_status": status, "recipe_content": effective}
-        validate_snapshot(snapshot, dish.pk)
+        try:
+            validate_snapshot(snapshot, dish.pk)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise DataIntegrityError("Invalid stored dish") from exc
         return snapshot

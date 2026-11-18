@@ -210,3 +210,31 @@ class PlanningTests(TestCase):
         self.assertEqual(menu.slots[(0, "lunch")].state, "selected")
         self.assertEqual(menu.slots[(1, "lunch")].state, "pending")
         self.assertIsNone(menu.undo)
+
+    def test_dish_creation_retry_preserves_token_after_database_failure(self):
+        from unittest.mock import patch
+        from uuid import uuid4
+        from django.db import OperationalError
+        from django.urls import reverse
+        token = str(uuid4())
+        data = {"token": token, "name": "Plat de prova", "primary": "cereals", "preference": "both"}
+        with patch("menus.web.views.create_dish", side_effect=OperationalError("synthetic lock")):
+            response = self.client.post(reverse("dish_create"), data)
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(response, token, status_code=503)
+        self.assertContains(response, "Plat de prova", status_code=503)
+
+    def test_corrupt_snapshot_blocks_post_with_unavailable_status(self):
+        from unittest.mock import patch
+        from django.urls import reverse
+        from menus.models import MenuSlotRecord
+        create_menu(self.repo, self.clock, self.week)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        row = MenuSlotRecord.objects.get(weekly_menu_id=self.week, day_index=0, meal="lunch")
+        row.dish_snapshot["schema_version"] = 999
+        row.save(update_fields=["dish_snapshot"])
+        url = reverse("menu_action", args=[self.week.isoformat(), 1, "lunch", "assign"])
+        with patch("menus.web.views.MadridClock", return_value=self.clock):
+            response = self.client.post(url, {"version": 2, "dish": self.dish.pk})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(WeeklyMenuRecord.objects.get(pk=self.week).version, 2)

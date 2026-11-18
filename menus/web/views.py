@@ -318,7 +318,7 @@ def dish_edit(request, dish_id=None):
         except DishConflict:
             error, status = "El contingut ha canviat. Revisa les dades abans de tornar-ho a provar.", 409
         except (DatabaseError, Rollover):
-            return unavailable()
+            error, status = "No s’ha pogut desar. Revisa les dades abans de tornar-ho a provar.", 503
     return render(request, "menus/dish_edit.html", {"dish": dish, "categories": categories.items(), "values": values, "error": error, "conflict": status == 409}, status=status)
 
 from menus.application.dishes import set_archived
