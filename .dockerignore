@@ -12,3 +12,20 @@
 !menus/static/
 !menus/static/**
 menus/tests/
+
+# Re-exclude local artifacts even below a re-included source directory.
+**/.*
+**/__pycache__
+**/*.py[cod]
+**/*.sqlite3*
+**/*.csv
+**/*.log
+**/*.log.*
+**/*.pem
+**/*.key
+**/backups
+**/private-ux
+**/local-analysis
+**/review-drafts
+**/TECHNICAL-REVIEW*.md
+**/local-progress.md

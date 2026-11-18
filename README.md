@@ -38,6 +38,16 @@ The provided Compose and Docker files are preliminary and have not yet passed im
 
 Use an allowlisted build context staged outside the source directory, containing only `Dockerfile`, `requirements.txt`, `manage.py`, `config/`, and the required Python, template and static files under `menus/`. Verify its contents before building; exclude private databases, CSV files, secrets, backups and logs. Do not bind to a public interface. Actual IPv4 and IPv6 isolation, guest-network denial, router forwards and any tunnels must be checked by the owner before release. No production deployment or unrelated service changes are authorized by this document.
 
+## Isolated Docker verification
+
+From the repository root, run:
+
+```sh
+sh scripts/verify-docker.sh
+```
+
+Run this as your regular user from a terminal. The script requests sudo for Docker and Compose and writes the log as your regular user. The script verifies the current commit. It builds from an allowlisted temporary context, checks Docker exclusions with synthetic markers, validates the Compose configuration, and runs migrations and Gunicorn smoke checks using a disposable volume. It publishes no host ports and removes its test resources at the end. The latest completed run is saved to the ignored `logs/docker-verification.log`, including failures and the commit tested. This run does not verify network isolation on the household LAN.
+
 ## SQLite backup rehearsal
 
 Use explicit private paths and SQLite's online backup API; never copy an active database file alone or overwrite the live database during a rehearsal. The destination must not already exist. For example, with paths selected outside the repository:
