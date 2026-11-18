@@ -1,7 +1,14 @@
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from typing import Protocol
 
 from menus.domain.catalogue import CatalogueDish
+
+
+@dataclass(frozen=True)
+class ImportResult:
+    inserted: int
+    unchanged: int
 
 
 class CatalogueConflict(Exception):
@@ -16,7 +23,7 @@ class CatalogueRepository(Protocol):
     def add(self, dish: CatalogueDish) -> None: ...
 
 
-def import_catalogue(dishes: list[CatalogueDish], repository: CatalogueRepository) -> int:
+def import_catalogue(dishes: list[CatalogueDish], repository: CatalogueRepository) -> ImportResult:
     with repository.transaction():
         missing = []
         for dish in dishes:
@@ -27,4 +34,4 @@ def import_catalogue(dishes: list[CatalogueDish], repository: CatalogueRepositor
                 raise CatalogueConflict(dish.id)
         for dish in missing:
             repository.add(dish)
-        return len(missing)
+        return ImportResult(inserted=len(missing), unchanged=len(dishes) - len(missing))

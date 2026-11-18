@@ -238,3 +238,12 @@ class PlanningTests(TestCase):
             response = self.client.post(url, {"version": 2, "dish": self.dish.pk})
         self.assertEqual(response.status_code, 503)
         self.assertEqual(WeeklyMenuRecord.objects.get(pk=self.week).version, 2)
+
+    def test_shopping_get_does_not_create_overlay_state(self):
+        from django.urls import reverse
+        from menus.models import ShoppingStateRecord
+        create_menu(self.repo, self.clock, self.week)
+        url = reverse("shopping_week", args=[self.week.isoformat()])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertFalse(ShoppingStateRecord.objects.exists())

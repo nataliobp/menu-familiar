@@ -17,9 +17,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             dishes = read_catalogue(options["csv_path"])
-            count = import_catalogue(dishes, DjangoCatalogueRepository())
+            result = import_catalogue(dishes, DjangoCatalogueRepository())
         except InvalidCatalogue as exc:
             raise CommandError(f"Catàleg invàlid ({exc}); no s’ha modificat cap plat.") from exc
         except (OSError, CatalogueConflict, DatabaseError) as exc:
             raise CommandError("No s'ha pogut importar el catàleg; no s'ha modificat cap plat.") from exc
-        self.stdout.write(f"Importació completada: {count} plats nous.")
+        self.stdout.write(f"Importació completada: {result.inserted} plats nous; {result.unchanged} sense canvis.")

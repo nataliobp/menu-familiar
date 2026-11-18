@@ -9,7 +9,7 @@ from django.db import IntegrityError
 from io import StringIO
 from django.test import TestCase as DjangoTestCase
 
-from menus.application.catalogue_import import CatalogueConflict, import_catalogue
+from menus.application.catalogue_import import CatalogueConflict, ImportResult, import_catalogue
 from menus.domain.catalogue import CatalogueDish
 from menus.infrastructure.csv_catalogue import InvalidCatalogue, read_catalogue
 from menus.infrastructure.django_catalogue import DjangoCatalogueRepository
@@ -70,9 +70,9 @@ class ImportTests(DjangoTestCase):
 
     def test_empty_repeat_partial_and_unrelated(self):
         self.repository.add(self.unrelated)
-        self.assertEqual(import_catalogue([self.first], self.repository), 1)
-        self.assertEqual(import_catalogue([self.first, self.second], self.repository), 1)
-        self.assertEqual(import_catalogue([self.first, self.second], self.repository), 0)
+        self.assertEqual(import_catalogue([self.first], self.repository), ImportResult(1, 0))
+        self.assertEqual(import_catalogue([self.first, self.second], self.repository), ImportResult(1, 1))
+        self.assertEqual(import_catalogue([self.first, self.second], self.repository), ImportResult(0, 2))
         self.assertEqual(self.repository.get(1), self.first)
         self.assertEqual(self.repository.get(99), self.unrelated)
         self.assertEqual(DishRecord.objects.count(), 3)
@@ -129,7 +129,7 @@ class SourceFidelityTests(DjangoTestCase):
         self.assertEqual(len(dishes), 57)
         self.assertTrue({dish.id for dish in dishes} == set(range(1, 58)), "Unexpected source identities")
         self.assertTrue({dish.id for dish in dishes if dish.special_occasion} == {25, 31, 43, 52, 55}, "Unexpected source flags")
-        self.assertEqual(import_catalogue(dishes, DjangoCatalogueRepository()), 57)
+        self.assertEqual(import_catalogue(dishes, DjangoCatalogueRepository()), ImportResult(57, 0))
         with Path(source).open(encoding="utf-8-sig", newline="") as input_file:
             for row in csv.DictReader(input_file):
                 record = DishRecord.objects.get(pk=int(row["id"]))
