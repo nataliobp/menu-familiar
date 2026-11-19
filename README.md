@@ -1,6 +1,6 @@
-# Family menu
+# Menú Familiar
 
-Django application for household meal planning. The authoritative contracts are [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs](docs/specs/README.md) and [docs/ux](docs/ux/README.md). V1 implementation and acceptance work is in progress; do not deploy it before independent review and consolidated owner QA.
+Django application for household meal planning. The authoritative contracts are [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs](docs/specs/README.md) and [docs/ux](docs/ux/README.md). Record consolidated owner QA and verify household network isolation before releasing the service.
 
 ## Disposable development setup
 
@@ -32,13 +32,72 @@ DJANGO_ENV=development DJANGO_DB_PATH="$TEST_DIR/unused.sqlite3" DJANGO_TEST_DB_
 
 The test runner removes its test database. Without `DJANGO_TEST_DB_PATH`, these concurrency tests are skipped. Without the private-source variable the private-source test is skipped. Do not commit private data or copy its contents into logs. To import, first verify the target database path, run migrations, then run `python manage.py import_catalogue /absolute/path/to/private.csv`. The importer validates the entire source before a single atomic write and rejects conflicting IDs.
 
-## Production configuration and release gates
+## Permanent deployment
 
-The previous isolated Docker verification passed for commit `3782a0edd7c69c7adee77bb4cc5ac31294e471df`. Verify the candidate commit and record its image ID before using it. Set an independent `DJANGO_SECRET_KEY`, comma-separated `DJANGO_ALLOWED_HOSTS`, an absolute private data directory in `MENU_DATA_DIR`, and an explicit trusted interface and port in `MENU_BIND_ADDRESS` and `MENU_PORT`; `.env.example` contains placeholders. Production requires an absolute `DJANGO_DB_PATH` and debug defaults off. The data directory must be writable by container UID 10001. Run migrations as a one-off before starting the app. `/healthz` reports database reachability without exposing data.
+Run these commands as your regular user on the Home Server. The maintenance scripts invoke `sudo` for Docker, use the repository's private `.env`, and target only the `menu-familiar` Compose project. Production uses TCP **18766** on the server's stable trusted LAN IPv4 address and keeps SQLite in **/var/lib/menu-familiar/data**. Use the host's local system disk. The container runs as UID/GID 10001 and requires the data directory to exist.
 
-Gunicorn is pinned to [upstream's latest stable release, 27.0.1](https://github.com/benoitc/gunicorn/releases/tag/27.0.1), as checked on 18 November 2026. Its unused control socket is disabled in the image. The isolated Docker verification checks the restored database with the candidate image before tagging it.
+### First installation
 
-Use an allowlisted build context staged outside the source directory, containing only `Dockerfile`, `requirements.txt`, `manage.py`, `config/`, and the required Python, template and static files under `menus/`. Verify its contents before building; exclude private databases, CSV files, secrets, backups and logs. Do not bind to a public interface. Actual IPv4 and IPv6 isolation, guest-network denial, router forwards and any tunnels must be checked by the owner before release. No production deployment or unrelated service changes are authorized by this document.
+1. Check out and verify the release locally. Inspect the interface addresses, the fixed port and Docker's boot configuration.
+
+   ```bash
+   git switch --detach v1.0.0
+   sh scripts/verify-docker.sh --keep-image
+   ip -4 -br address show up
+   sudo ss -lnt 'sport = :18766'
+   sudo docker ps --format 'table {{.Names}}	{{.Ports}}'
+   systemctl is-enabled docker.service
+   ```
+
+   Port 18766 must be free. Choose the stable IPv4 address on the trusted household interface. Check that it comes up on boot. Record the verified image tag and image ID from the verification output.
+
+2. Create the private configuration and dedicated storage. Run this once from the release checkout in Bash. The configuration command refuses to replace an existing `.env`.
+
+   ```bash
+   (
+       set -euo pipefail
+       umask 077
+       set -o noclobber
+       read -r -p 'Stable trusted LAN IPv4 address: ' menu_lan_ip
+       menu_secret="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+       menu_commit="$(git rev-parse HEAD)"
+       cat > .env <<EOF
+   DJANGO_SECRET_KEY=$menu_secret
+   DJANGO_ALLOWED_HOSTS=$menu_lan_ip
+   MENU_BIND_ADDRESS=$menu_lan_ip
+   MENU_PORT=18766
+   MENU_DATA_DIR=/var/lib/menu-familiar/data
+   MENU_IMAGE=menu-familiar:verified-$menu_commit
+   EOF
+   )
+   sudo install -d -m 0755 /var/lib/menu-familiar
+   sudo install -d -m 0700 -o 10001 -g 10001 /var/lib/menu-familiar/data
+   ./scripts/compose.sh config --quiet
+   ```
+
+3. Initialize the new production database. Keep the existing QA project, environment and database in place until the owner decides whether to migrate or discard them. For an owner-approved migration, use the backup procedure below to snapshot the QA database into a new production directory, then apply the release migrations to that copy.
+
+   ```bash
+   ./scripts/compose.sh run --rm --no-deps --pull never menu-familiar python manage.py migrate --noinput
+   ```
+
+   For a fresh database, the owner can optionally seed the private catalogue from the checkout before starting the service.
+
+   ```bash
+   ./scripts/compose.sh run --rm --no-deps --pull never -T menu-familiar \
+       sh -ec 'umask 077; cat > /tmp/catalogue.csv; python manage.py import_catalogue /tmp/catalogue.csv' < PLATOS_57.csv
+   ```
+
+4. Complete the owner QA checklist with the disposable QA instance. Before opening production to household use, confirm that the router, any inter-network firewall, and any VPN or tunnel restrict this endpoint to the trusted household LAN. A specific IPv4 bind limits the published destination, while routers and VPNs can still route clients to it. Keep the port out of router forwards, public proxies and tunnels. Verify the installed endpoint from trusted devices and test denial from guest Wi-Fi, a VPN client and outside the LAN over IPv4 and IPv6. If isolation fails, stop the service and correct the scoped access rules before resuming.
+
+   ```bash
+   ./start.sh
+   ./status.sh
+   menu_lan_ip="$(sed -n 's/^MENU_BIND_ADDRESS=//p' .env)"
+   curl --noproxy '*' -fsS --retry 10 --retry-connrefused --retry-delay 1 --max-time 5 "http://$menu_lan_ip:18766/healthz"
+   ```
+
+   Expect `OK` and open `/menu/` from a trusted device. Compose uses `restart: unless-stopped`, so a running service returns when Docker starts after a reboot. `./stop.sh` leaves it stopped until `./start.sh` is run. Verify automatic restart and data persistence at the next scheduled reboot.
 
 ## Isolated Docker verification
 
@@ -54,21 +113,20 @@ Run this as your regular user from a terminal. The script requests sudo for Dock
 
 Install Playwright and Chromium in a QA environment using `python -m pip install playwright` and `python -m playwright install chromium`. Then run `python scripts/verify-browser.py` from the checkout. It starts a disposable loopback server, creates a fresh synthetic SQLite database, and runs the browser with JavaScript disabled. Playwright is a QA tool and is excluded from the runtime image.
 
-## SQLite backup rehearsal
+## Backup
 
-Use explicit private paths and SQLite's online backup API; never copy an active database file alone or overwrite the live database during a rehearsal. The destination must not already exist. For example, with paths selected outside the repository:
+Use SQLite's online backup API for a consistent snapshot, including when the app is running. For an update, stop the service before taking the snapshot so it also captures the final pre-migration state. Store backups and a protected copy of `.env` outside Git and keep a copy on separate private storage. Record the release tag and verified image ID alongside each backup. Use the configured data directory if it differs from the default below.
 
 ```sh
-export MENU_BACKUP_SOURCE=/absolute/path/to/source.sqlite3
-export MENU_BACKUP_TARGET=/absolute/path/to/new-backup.sqlite3
-umask 077
-.venv/bin/python - <<'PYBACKUP'
+sudo install -d -m 0700 /var/lib/menu-familiar/backups
+menu_backup="/var/lib/menu-familiar/backups/menu-$(date -u +%Y%m%dT%H%M%SZ).sqlite3"
+sudo python3 - /var/lib/menu-familiar/data/menu.sqlite3 "$menu_backup" <<'PYBACKUP'
 import os
 from pathlib import Path
 import sqlite3
+import sys
 
-source = Path(os.environ["MENU_BACKUP_SOURCE"])
-target = Path(os.environ["MENU_BACKUP_TARGET"])
+source, target = map(Path, sys.argv[1:])
 if not source.is_absolute() or not target.is_absolute():
     raise SystemExit("Both paths must be absolute")
 source = source.resolve(strict=True)
@@ -82,19 +140,58 @@ with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as source_db:
 PYBACKUP
 ```
 
-Restore to a separate location and verify compatible migrations and representative records.
+## Updates
 
-For an owner-authorized release, verify the candidate from its committed source using `sh scripts/verify-docker.sh --keep-image`. Use the exact candidate tag and record the reported image ID with the matching pre-migration backup. Compose uses that image. It does not build from the checkout. With the owner-approved private environment file and backup prepared:
+Fetch the approved release tag and verify it while the old container is still running.
 
-```sh
-export MENU_IMAGE='menu-familiar:verified-REPLACE_WITH_VERIFIED_COMMIT'
-docker compose --env-file /absolute/path/to/private-menu.env config --quiet &&
-docker compose --env-file /absolute/path/to/private-menu.env stop menu-familiar &&
-docker compose --env-file /absolute/path/to/private-menu.env run --rm --no-deps menu-familiar python manage.py migrate --noinput &&
-docker compose --env-file /absolute/path/to/private-menu.env up -d --no-build menu-familiar
+```bash
+read -r -p 'Approved release tag: ' menu_release
+git fetch origin tag "$menu_release"
+git switch --detach "$menu_release"
+sh scripts/verify-docker.sh --keep-image
 ```
 
-Replace the example tag with the verified tag. If migration fails, review the error and follow the rollback steps before starting the service. For rollback, stop only `menu-familiar`, keep the failed candidate database for investigation, and restore the matching backup into a new private data directory. Verify the copy with `PRAGMA integrity_check` and the previous image with `python manage.py migrate --check`. Set `MENU_IMAGE` and `MENU_DATA_DIR` to the matched pair, then use the same `up -d --no-build` command and check `/healthz`. The owner must verify actual trusted and untrusted IPv4 and IPv6 access separately.
+Run `./stop.sh`, take a backup using the commands above, and preserve the current `.env` in the backup directory.
+
+```bash
+sudo install -m 0600 .env "$menu_backup.env"
+vim .env
+```
+
+Set `MENU_IMAGE` to the new verified tag printed by the script. Keep the same address, port, secret and data directory. Run the migration and start only if it succeeds.
+
+```bash
+./scripts/compose.sh config --quiet &&
+./scripts/compose.sh run --rm --no-deps --pull never menu-familiar python manage.py migrate --noinput &&
+./start.sh &&
+./status.sh
+```
+
+Repeat the health and trusted-device checks. If the migration or smoke check fails, use the recovery procedure with the matching pre-update backup and image.
+
+## Recovery
+
+Rehearse with a synthetic backup before relying on the procedure. For a production restore or rollback, stop the production service and use a new directory. Preserve the previous data directory and its SQLite sidecar files. The backup file must be the verified standalone snapshot.
+
+```bash
+./stop.sh
+read -r -p 'Absolute path to the verified SQLite backup: ' menu_backup
+menu_restore_dir="$(sudo mktemp -d /var/lib/menu-familiar/restore.XXXXXXXX)"
+sudo install -m 0600 -o 10001 -g 10001 "$menu_backup" "$menu_restore_dir/menu.sqlite3"
+sudo chown 10001:10001 "$menu_restore_dir"
+sudo python3 -c 'import pathlib, sqlite3, sys; db = sqlite3.connect(pathlib.Path(sys.argv[1]).as_uri() + "?mode=ro", uri=True); sys.exit(0 if db.execute("PRAGMA integrity_check").fetchall() == [("ok",)] else "Backup integrity check failed")' "$menu_restore_dir/menu.sqlite3"
+printf 'Restore MENU_DATA_DIR=%s\n' "$menu_restore_dir"
+```
+
+Proceed after the integrity check succeeds. Use `vim .env` to restore the matching configuration and set `MENU_DATA_DIR` to the printed directory. Set `MENU_IMAGE` to the verified image that matches the snapshot. If the image is missing, check out the matching release and run `sh scripts/verify-docker.sh --keep-image` to rebuild and verify it.
+
+```bash
+./scripts/compose.sh run --rm --no-deps --pull never menu-familiar python manage.py migrate --check &&
+./start.sh &&
+./status.sh
+```
+
+Repeat the health check, then inspect representative weeks, dishes and shopping lists from a trusted device.
 
 ## Consolidated manual owner QA (pending)
 
@@ -108,4 +205,4 @@ Use a disposable database and synthetic dishes first. Do not run destructive or 
 - Shopping: check aggregation, compatible conversions, repeated dishes, distinct units, `al gust`, incomplete coverage, manual products, adjustments, checks, orphan recovery and reset after menu and recipe changes.
 - Readiness: inspect 360–430px mobile and 800×480 / 1024×600 tablet flows, keyboard and focus; verify restart and isolated backup/restore; confirm trusted LAN access and denial from untrusted networks over IPv4 and IPv6.
 
-Manual owner QA has not been performed. Network isolation and release authorization are separate pending gates.
+Record the owner’s results and the actual network isolation checks before making the service available for household use.
