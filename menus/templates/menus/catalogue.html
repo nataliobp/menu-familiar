@@ -1,1 +1,30 @@
-{% extends "menus/base.html" %}{% block content %}<h1>Plats</h1>{% if error %}<p id="filter-error" role="alert" tabindex="-1" autofocus>{{ error }}</p>{% endif %}<a href="{% url 'dish_create' %}">Nou plat</a> · <a href="?archived={% if archived %}0{% else %}1{% endif %}">{% if archived %}Actius{% else %}Arxivats{% endif %}</a><form method="get"><input type="hidden" name="archived" value="{% if archived %}1{% else %}0{% endif %}"><label for="q">Cerca un plat</label><input id="q" name="q" maxlength="200" {% if error %}aria-describedby="filter-error"{% endif %} value="{{ query }}"><label for="category">Categoria</label><select id="category" name="category" {% if error %}aria-describedby="filter-error"{% endif %}><option value="">Totes les categories</option>{% for key, name in categories %}<option value="{{ key }}" {% if category == key %}selected{% endif %}>{{ name }}</option>{% endfor %}</select><button>Cerca</button></form><ul>{% for dish in dishes %}<li><a href="{% url 'dish_detail' dish.id %}">{{ dish.name }}</a> · {{ dish.primary_category.name_ca }} · {% if dish.meal_preference == "lunch" %}Dinar{% elif dish.meal_preference == "dinner" %}Sopar{% else %}Dinar i sopar{% endif %}{% if dish.special_occasion %} · Ocasió especial{% endif %} · {% if dish.recipe_status == "published" %}Recepta publicada{% elif dish.recipe_status == "draft" %}Esborrany{% else %}Recepta pendent{% endif %}</li>{% empty %}<li>No s’han trobat plats.</li>{% endfor %}</ul>{% endblock %}
+{% extends "menus/base.html" %}
+{% block title %}{% if archived %}Plats arxivats{% else %}Plats{% endif %}{% endblock %}
+{% block content %}
+<div class="toolbar screen-heading">
+  <h1>{% if archived %}Plats arxivats{% else %}Plats{% endif %}</h1>
+  <div class="toolbar">
+    {% if archived %}
+      <a class="button" href="{% url 'catalogue' %}">{% include "menus/components/icon.html" with name="back" only %}Tots els plats</a>
+    {% else %}
+      <a class="button archive-link" href="?archived=1" aria-label="Arxivats">{% include "menus/components/icon.html" with name="archive" only %}<span>Arxivats</span></a>
+      <a class="button primary" href="{% url 'dish_create' %}">{% include "menus/components/icon.html" with name="plus" only %}Nou plat</a>
+    {% endif %}
+  </div>
+</div>
+{% include "menus/components/filters.html" %}
+<div class="catalogue-groups">
+  {% for group, members in groups %}
+    <section>
+      {% include "menus/components/group_heading.html" %}
+      <ul class="result-list">
+        {% for dish in members %}
+          <li><a class="list-row" href="{% url 'dish_detail' dish.id %}{% if archived %}?archived=1{% endif %}">{% include "menus/components/dish_row.html" with catalogue_row=True %}</a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% empty %}
+    <p class="empty">No s’han trobat plats.</p>
+  {% endfor %}
+</div>
+{% endblock %}

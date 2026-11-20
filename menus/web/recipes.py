@@ -15,6 +15,7 @@ from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import DjangoPlanningRepository, MadridClock
 from menus.web.common import MEALS, parse_week, unavailable
+from menus.web.presentation import recipe_read_context
 
 
 @require_http_methods(["GET"])
@@ -25,17 +26,10 @@ def recipe_view(request, dish_id):
             if not dish:
                 raise Http404()
             recipe = get_recipe(DjangoCatalogueQueries(), dish_id)
-    except DatabaseError:
+        context = recipe_read_context(recipe)
+    except (DatabaseError, ValueError):
         return unavailable()
-    content = (recipe.published or recipe.draft) if recipe else None
-    try:
-        if recipe and recipe.published is not None:
-            validate_content(recipe.published, True)
-        if recipe and recipe.draft is not None:
-            validate_content(recipe.draft)
-    except ValueError:
-        return unavailable()
-    return render(request, "menus/recipe.html", {"dish": dish, "recipe": recipe, "content": content})
+    return render(request, "menus/recipe.html", {"dish": dish, **context})
 
 
 def posted_recipe(request):
@@ -183,7 +177,7 @@ def edit_recipe(request, fields, context, dish_id, submitted_dish_id, intent):
                 messages.success(request, "Recepta publicada" if publish else "Esborrany desat")
                 if context:
                     return redirect("slot_detail", week=week.isoformat(), day=day, meal=meal)
-                return redirect("recipe_view", dish_id=dish_id)
+                return redirect("dish_detail", dish_id=dish_id)
             except (ValueError, TypeError):
                 error, status = "Revisa la preparació i els ingredients. Per publicar, completa totes les quantitats o marca «Al gust».", 400
             except (DishConflict, PlanningConflict):

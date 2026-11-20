@@ -1,1 +1,10 @@
-{% extends "menus/base.html" %}{% load menus_format %}{% block content %}<h1>Recepta · {{ dish.name }}</h1><p>Per a 2 adults</p>{% if content %}<p>{% if recipe.published %}Publicada{% else %}Esborrany{% endif %}</p><p>{{ content.preparation|linebreaksbr }}</p><ul>{% for line in content.ingredients %}<li>{{ line.name }} · {% if line.taste %}Al gust{% elif line.quantity %}{{ line.quantity|decimal_ca }} {% if line.unit == "unit" %}unitats{% else %}{{ line.unit }}{% endif %}{% else %}Quantitat pendent{% endif %} {{ line.note }}</li>{% endfor %}</ul>{% else %}<p>Recepta pendent</p>{% endif %}{% if recipe.published and recipe.draft %}<p>Hi ha canvis sense publicar.</p>{% endif %}<a href="{% url 'recipe_edit' dish.id %}">Edita la recepta</a> · <a href="{% url 'dish_detail' dish.id %}">Torna al plat</a>{% endblock %}
+{% extends "menus/base.html" %}
+{% block title %}Recepta · {{ dish.name }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <a class="button" href="{% url 'dish_detail' dish.id %}">{% include "menus/components/icon.html" with name="back" only %}Torna al plat</a>
+  <a class="button" href="{% url 'recipe_edit' dish.id %}">{% include "menus/components/icon.html" with name="edit" only %}Edita la recepta</a>
+</div>
+<h1 class="detail-title">Recepta · {{ dish.name }}</h1>
+{% include "menus/components/recipe_content.html" %}
+{% endblock %}

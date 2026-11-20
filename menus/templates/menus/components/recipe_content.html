@@ -1,0 +1,39 @@
+{% load menus_format %}
+{% if recipe_status == "published" %}
+  <p class="hint">Recepta publicada{% if unpublished_changes %} · Hi ha canvis sense publicar.{% endif %}</p>
+{% elif recipe_status == "draft" %}
+  <p class="notice">Esborrany · Recepta incompleta</p>
+{% else %}
+  <p class="notice">Recepta pendent</p>
+{% endif %}
+<div class="recipe-body">
+  <section class="panel">
+    <h2>Ingredients <small>· 2 persones</small></h2>
+    {% if content.ingredients %}
+      <ul class="ingredient-list">
+        {% for line in content.ingredients %}
+          <li class="ingredient">
+            <div>{{ line.name }}{% if line.note %}<small>{{ line.note }}</small>{% endif %}</div>
+            <strong>
+              {% if line.taste %}Al gust
+              {% elif line.quantity %}
+                {% with amount=line.quantity|recipe_quantity_ca %}
+                  {{ amount }} {% if line.unit == 'unit' %}{% if amount == '1' %}unitat{% else %}unitats{% endif %}{% else %}{{ line.unit }}{% endif %}
+                {% endwith %}
+              {% else %}Quantitat pendent{% if line.unit %} · {% if line.unit == 'unit' %}unitats{% else %}{{ line.unit }}{% endif %}{% endif %}
+              {% endif %}
+            </strong>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}<p class="hint">Encara no hi ha ingredients.</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>Preparació</h2>
+    {% with steps=content.preparation|preparation_steps %}
+      {% if steps %}
+        <ol class="steps">{% for step in steps %}<li>{{ step }}</li>{% endfor %}</ol>
+      {% else %}<p class="hint">Encara no hi ha cap mètode de preparació.</p>{% endif %}
+    {% endwith %}
+  </section>
+</div>

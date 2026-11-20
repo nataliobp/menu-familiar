@@ -147,7 +147,10 @@ class PlanningTests(TestCase):
             self.assertContains(response, "Arròs")
             self.assertContains(response, "160,000")
             recipe = self.client.get(reverse("recipe_view", args=[self.dish.pk]))
-            self.assertContains(recipe, "160,000")
+            self.assertContains(recipe, "160 g")
+            dish = self.client.get(reverse("dish_detail", args=[self.dish.pk]))
+            self.assertContains(dish, "160 g")
+            self.assertContains(dish, "Coeu-ho")
 
     def test_recipe_discard_review_preserves_unsaved_values(self):
         from django.urls import reverse

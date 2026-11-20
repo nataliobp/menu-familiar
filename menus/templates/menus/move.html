@@ -4,7 +4,7 @@
 <h1>{% if action == 'exchange' %}Confirma l’intercanvi{% else %}Confirma el moviment{% endif %}</h1>
 <p>Destinació: {{ target_label }} · {{ target_meal_label }}{% if target.dish %} · {{ target.dish.name }}{% endif %}</p>
 {% if target.state == 'skipped' %}<p>Aquest àpat està omès. Vols substituir l’omissió?</p>{% endif %}
-<form method="post" action="{% url 'move_action' week|date:'Y-m-d' action %}">
+<form class="toolbar form-actions" method="post" action="{% url 'move_action' week|date:'Y-m-d' action %}">
   {% csrf_token %}
   <input type="hidden" name="version" value="{{ menu.version }}">
   <input type="hidden" name="source_day" value="{{ day }}">
@@ -12,16 +12,16 @@
   <input type="hidden" name="destination_day" value="{{ target_day }}">
   <input type="hidden" name="destination_meal" value="{{ target_meal }}">
   {% if target.state == 'skipped' %}<input type="hidden" name="confirm" value="yes">{% endif %}
-  <button>{% if action == 'exchange' %}Intercanvia els plats{% else %}Mou el plat{% endif %}</button>
+  <button class="primary">{% if action == 'exchange' %}Intercanvia els plats{% else %}Mou el plat{% endif %}</button>
 </form>
-<a href="{% url 'move_choice' week|date:'Y-m-d' day meal %}">Torna a les destinacions</a>
+<a class="button" href="{% url 'move_choice' week|date:'Y-m-d' day meal %}">Torna a les destinacions</a>
 {% else %}
 <h1>Tria la destinació</h1>
-<ul>
+<ul class="result-list">
 {% for target_day, label, target_meal, meal_label, slot in choices %}
-  <li><a href="?destination_day={{ target_day }}&amp;destination_meal={{ target_meal }}&amp;version={{ menu.version }}">{{ label }} · {{ meal_label }} · {% if slot.dish %}{{ slot.dish.name }}{% elif slot.state == 'skipped' %}Omès{% else %}Pendent{% endif %}</a></li>
+  <li><a class="list-row" href="?destination_day={{ target_day }}&amp;destination_meal={{ target_meal }}&amp;version={{ menu.version }}">{{ label }} · {{ meal_label }} · {% if slot.dish %}{{ slot.dish.name }}{% elif slot.state == 'skipped' %}Omès{% else %}Pendent{% endif %}</a></li>
 {% endfor %}
 </ul>
 {% endif %}
-<a href="{% url 'slot_detail' week|date:'Y-m-d' day meal %}">Cancel·la</a>
+<a class="button" href="{% url 'slot_detail' week|date:'Y-m-d' day meal %}">Cancel·la</a>
 {% endblock %}

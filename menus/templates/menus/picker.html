@@ -1,1 +1,45 @@
-{% extends "menus/base.html" %}{% block title %}Tria un plat{% endblock %}{% block content %}<h1>{% if action == 'replace' %}Canvia el plat{% else %}Tria un plat{% endif %} · {{ day_label }}, {{ meal_label }}</h1>{% if error %}<p id="filter-error" role="alert" tabindex="-1" autofocus>{{ error }}</p>{% endif %}{% if slot.suggestion %}<p>Suggeriments: {{ slot.suggestion.1 }}</p>{% endif %}<form method="get"><input type="hidden" name="action" value="{{ action }}"><label for="q">Cerca un plat</label><input id="q" name="q" maxlength="200" {% if error %}aria-describedby="filter-error"{% endif %} value="{{ query }}"><label for="category">Categoria</label><select id="category" name="category" {% if error %}aria-describedby="filter-error"{% endif %}><option value="">Totes les categories</option>{% for key, name in categories %}<option value="{{ key }}" {% if category == key %}selected{% endif %}>{{ name }}</option>{% endfor %}</select><button>Cerca</button></form><a href="?mode=all&amp;action={{ action }}">Mostra tots els plats</a>{% for dish in dishes %}<form method="post" action="{% url 'menu_action' week|date:'Y-m-d' day meal action %}">{% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}"><input type="hidden" name="dish" value="{{ dish.id }}"><button>{{ dish.name }} · {{ dish.primary_name }}{% if dish.special_occasion %} · Ocasió especial{% endif %}</button></form>{% empty %}<p>No s’han trobat plats.</p>{% endfor %}{% if action == 'assign' %}<form method="post" action="{% url 'confirm_skip' week|date:'Y-m-d' day meal %}">{% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}"><button>Omet aquest àpat</button></form>{% endif %}<a href="{% url 'menu_week' week|date:'Y-m-d' %}">Cancel·la</a>{% endblock %}
+{% extends "menus/base.html" %}
+{% block title %}Tria un plat{% endblock %}
+{% block content %}
+<div class="toolbar screen-heading">
+  <h1>{% if action == 'replace' %}Canvia el plat{% else %}Tria un plat{% endif %}</h1>
+  <a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">{% include "menus/components/icon.html" with name="close" only %}Cancel·la</a>
+</div>
+<div class="picker-context">
+  <strong>{{ day_label }} · {{ meal_label }}</strong>
+  {% if slot.suggestion %}
+    <span class="pill">{% include "menus/components/category.html" with key=slot.suggestion.0 label=slot.suggestion.1 only %}</span>
+  {% endif %}
+</div>
+{% include "menus/components/filters.html" %}
+{% if category or query %}
+  <a class="button" href="?mode=all&amp;action={{ action }}">Mostra tots els plats</a>
+{% endif %}
+<p class="notice" role="status" data-picker-pending hidden>S’està desant la tria…</p>
+{% for heading, groups in tiers %}
+  {% if heading %}<h2 class="tier-heading">{{ heading }}</h2>{% endif %}
+  {% for group, members in groups %}
+    <section>
+      {% if group %}{% include "menus/components/group_heading.html" %}{% endif %}
+      <ul class="result-list">
+        {% for dish in members %}
+          <li>
+            <form data-picker-choice method="post" action="{% url 'menu_action' week|date:'Y-m-d' day meal action %}">
+              {% csrf_token %}
+              <input type="hidden" name="version" value="{{ menu.version }}">
+              <input type="hidden" name="dish" value="{{ dish.id }}">
+              <input type="hidden" name="from_picker" value="yes">
+              <input type="hidden" name="q" value="{{ query }}">
+              <input type="hidden" name="category" value="{{ category|default_if_none:'' }}">
+              <button class="list-row">{% include "menus/components/dish_row.html" %}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+{% empty %}<p class="empty">No s’han trobat plats.</p>{% endfor %}
+{% if action == 'assign' %}
+  <div class="toolbar form-actions">{% include "menus/components/skip_pending.html" %}</div>
+{% endif %}
+{% endblock %}

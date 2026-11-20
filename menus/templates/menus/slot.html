@@ -1,1 +1,29 @@
-{% extends "menus/base.html" %}{% load menus_format %}{% block content %}<h1>{{ day_label }} · {{ meal_label }}</h1>{% if slot.state == 'selected' %}<h2>{{ slot.dish.name }}</h2><p>Categoria principal: {{ slot.dish.primary_category.name }}</p>{% if slot.dish.secondary_categories %}<p>Categories secundàries: {% for category in slot.dish.secondary_categories %}{{ category.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}<p>Per a 2 adults</p>{% if slot.dish.recipe_content %}<p>{% if slot.dish.recipe_status == "draft" %}Esborrany{% else %}Recepta publicada{% endif %}</p><p>{{ slot.dish.recipe_content.preparation|linebreaksbr }}</p><ul>{% for ingredient in slot.dish.recipe_content.ingredients %}<li>{{ ingredient.name }} {% if ingredient.taste %}· Al gust{% elif ingredient.quantity %}· {{ ingredient.quantity|decimal_ca }} {% if ingredient.unit == "unit" %}unitats{% else %}{{ ingredient.unit }}{% endif %}{% else %}· Quantitat pendent{% endif %}{% if ingredient.note %} · {{ ingredient.note }}{% endif %}</li>{% endfor %}</ul>{% else %}<p>Recepta pendent</p>{% endif %}{% if editable %}<p><a href="{% url 'slot_recipe_edit' week|date:'Y-m-d' day meal %}">Edita la recepta compartida</a></p>{% endif %}{% elif slot.state == 'skipped' %}<p>Omès</p>{% else %}<p>Pendent</p>{% endif %}{% if editable %}{% if slot.state == 'selected' %}<p><a href="{% url 'menu_picker' week|date:'Y-m-d' day meal %}?action=replace">Canvia el plat</a></p><p><a href="{% url 'move_choice' week|date:'Y-m-d' day meal %}">Mou o intercanvia</a></p><p><a href="{% url 'confirm_remove' week|date:'Y-m-d' day meal %}?version={{ menu.version }}">Retira el plat</a></p>{% endif %}{% if slot.state == 'pending' %}<form method="post" action="{% url 'confirm_skip' week|date:'Y-m-d' day meal %}">{% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}"><button>Omet aquest àpat</button></form>{% elif slot.state == 'selected' %}<p><a href="{% url 'confirm_skip' week|date:'Y-m-d' day meal %}?version={{ menu.version }}">Omet aquest àpat</a></p>{% else %}<form method="post" action="{% url 'menu_action' week|date:'Y-m-d' day meal 'reactivate' %}">{% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}"><button>Torna a planificar</button></form>{% endif %}{% endif %}<a href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú</a>{% endblock %}
+{% extends "menus/base.html" %}
+{% block title %}{{ day_label }} · {{ meal_label }}{% endblock %}
+{% block content %}
+<a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">{% include "menus/components/icon.html" with name="back" only %}Torna al menú</a>
+<p class="hint detail-title">{{ day_label }} · {{ meal_label }}</p>
+{% if slot.state == 'selected' %}
+  <h1>{{ slot.dish.name }}</h1>
+  <div class="metadata">
+    <span class="pill"><span class="sr-only">Categoria principal</span>{% include "menus/components/category.html" with key=slot.dish.primary_category.key label=slot.dish.primary_category.name only %}</span>
+    {% for category in slot.dish.secondary_categories %}
+      <span class="pill secondary"><span class="sr-only">Categoria secundària</span>{% include "menus/components/category.html" with key=category.key label=category.name only %}</span>
+    {% endfor %}
+    <span class="pill secondary">{% include "menus/components/meal_preference.html" with value=slot.dish.meal_preference only %}</span>
+    {% if slot.dish.special_occasion %}<span class="pill secondary">{% include "menus/components/icon.html" with name="star" only %}Ocasió especial</span>{% endif %}
+  </div>
+  {% if editable %}
+    <div class="toolbar detail-actions">
+      <a class="button" href="{% url 'slot_recipe_edit' week|date:'Y-m-d' day meal %}">{% include "menus/components/icon.html" with name="edit" only %}Edita la recepta compartida</a>
+      <a class="button" href="{{ request.path }}" data-sheet="slot-actions" data-sheet-only data-heading="{{ day_label }} · {{ meal_label }}">{% include "menus/components/icon.html" with name="grid" only %}Accions de l’àpat</a>
+    </div>
+    <template id="slot-actions">{% include "menus/components/slot_actions.html" with in_sheet=True detail_url="" %}</template>
+    <div data-sheet-fallback>{% include "menus/components/slot_actions.html" %}</div>
+  {% else %}<p class="notice">Setmana passada · només consulta</p>{% endif %}
+  {% include "menus/components/recipe_content.html" with recipe_status=slot.dish.recipe_status content=slot.dish.recipe_content %}
+{% else %}
+  <h1>{% if slot.state == 'skipped' %}Omès{% else %}Pendent{% endif %}</h1>
+  {% if editable %}{% include "menus/components/slot_actions.html" %}{% endif %}
+{% endif %}
+{% endblock %}

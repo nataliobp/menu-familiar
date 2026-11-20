@@ -8,7 +8,7 @@
 </ul>{% endif %}
 {% if conflict %}
 
-<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">
+<form class="edit-form" method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">
     {% csrf_token %}
     {% for key, value in data.items %}
 <input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
@@ -18,7 +18,7 @@
 </form>
 {% elif target_missing %}
 <p>Aquest producte ja no és a la llista.</p>{% elif action == 'manual_add' or action == 'manual_edit' %}
-<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">{% csrf_token %}
+<form class="edit-form" method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">{% csrf_token %}
 <input type="hidden" name="menu_version" value="{{ menu_version }}">
 <input type="hidden" name="overlay_version" value="{{ overlay_version }}">
 <input type="hidden" name="token" value="{{ data.token }}">
@@ -27,7 +27,7 @@
 <input name="quantity" value="{{ data.quantity }}"></label><label>Unitat <select name="unit"><option value="">Sense unitat</option><option value="g" {% if data.unit == 'g' %}selected{% endif %}>g</option><option value="kg" {% if data.unit == 'kg' %}selected{% endif %}>kg</option><option value="ml" {% if data.unit == 'ml' %}selected{% endif %}>ml</option><option value="l" {% if data.unit == 'l' %}selected{% endif %}>l</option><option value="unit" {% if data.unit == 'unit' %}selected{% endif %}>unitats</option></select></label>
 <button>{% if new_creation %}Afegeix com a producte nou{% else %}Desa{% endif %}</button>
 </form>{% elif action == 'adjust' %}
-<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">{% csrf_token %}
+<form class="edit-form" method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">{% csrf_token %}
 <input type="hidden" name="menu_version" value="{{ menu_version }}">
 <input type="hidden" name="overlay_version" value="{{ overlay_version }}">
 <input type="hidden" name="key" value="{{ data.key }}">
@@ -37,7 +37,7 @@
 </form>
 {% elif reviewed %}
 
-<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">
+<form class="edit-form" method="post" action="{% url 'shopping_action' week|date:'Y-m-d' action %}">
     {% csrf_token %}
     {% for key, value in data.items %}
 <input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
@@ -50,5 +50,5 @@
 
 </form>
 {% endif %}
-<p><a href="{% url 'shopping_week' week|date:'Y-m-d' %}">Torna a la llista</a></p>
+<p><a class="button" href="{% url 'shopping_week' week|date:'Y-m-d' %}">Torna a la llista</a></p>
 {% endblock %}

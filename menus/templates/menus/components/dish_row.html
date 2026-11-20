@@ -1,0 +1,10 @@
+<span class="row-label">
+  <strong>{{ dish.name }}</strong>
+  {% if catalogue_row %}
+    <small>{% include "menus/components/meal_preference.html" with value=dish.meal_preference only %} · {% if dish.recipe_status == "published" %}Recepta publicada{% elif dish.recipe_status == "draft" %}Esborrany{% else %}Recepta pendent{% endif %}</small>
+  {% endif %}
+</span>
+{% if dish.special_occasion %}
+  <span class="sr-only">Ocasió especial</span>{% include "menus/components/icon.html" with name="star" only %}
+{% endif %}
+{% include "menus/components/icon.html" with name="right" only %}

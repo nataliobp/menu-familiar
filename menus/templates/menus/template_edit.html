@@ -3,11 +3,11 @@
 <p role="alert">{{ error }}</p>{% endif %}{% if conflict %}
 <p>La teva selecció: {{ selected_label }}</p>{% endif %}{% if current_label %}
 <p>Valor actual: {{ current_label }}</p>{% endif %}
-<form method="post">{% csrf_token %}
+<form class="edit-form" method="post">{% csrf_token %}
 <input type="hidden" name="version" value="{{ version }}"><label for="category">Categoria suggerida</label><select id="category" name="category"><option value="">Lliure</option>{% for key, label in categories %}<option value="{{ key }}" {% if selected == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-<div>{% if conflict %}
+<div class="toolbar form-actions">{% if conflict %}
 <button name="action" value="review">Revisa el valor actual</button>{% else %}
-<button type="submit">Desa</button>{% endif %} <a href="{% url 'weekly_template' %}">Cancel·la</a>
+<button type="submit" class="primary">Desa</button>{% endif %} <a class="button" href="{% url 'weekly_template' %}">Cancel·la</a>
 </div>
 </form>
 {% endblock %}

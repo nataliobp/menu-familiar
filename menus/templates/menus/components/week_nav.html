@@ -1,0 +1,10 @@
+<div class="week-nav" role="group" aria-label="Navega per setmanes">
+  {% if previous %}
+    <a class="icon-button" href="{% url week_route previous|date:'Y-m-d' %}" aria-label="Setmana anterior">{% include "menus/components/icon.html" with name="left" only %}</a>
+  {% else %}<span></span>{% endif %}
+  <strong>{{ week|date:'j/n' }}{% if week.year != week_end.year %}/{{ week.year }}{% endif %} – {{ week_end|date:'j/n/Y' }}</strong>
+  {% if next %}
+    <a class="icon-button" href="{% url week_route next|date:'Y-m-d' %}" aria-label="Setmana següent">{% include "menus/components/icon.html" with name="right" only %}</a>
+  {% else %}<span></span>{% endif %}
+  <a class="button" href="{% url current_route %}">{% include "menus/components/icon.html" with name="calendar" only %}Avui</a>
+</div>

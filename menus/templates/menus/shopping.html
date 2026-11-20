@@ -1,6 +1,6 @@
 {% extends "menus/base.html" %}{% load menus_format %}{% block content %}
-<h1>Llista de la compra</h1><p>Setmana del {{ week|date:'d/m/Y' }}</p>
-<p><a href="{% url 'menu_week' week|date:'Y-m-d' %}">Ves al menú de la setmana</a></p>
+<h1>Llista de la compra</h1>{% include "menus/components/week_nav.html" %}
+<p><a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">Ves al menú de la setmana</a></p>
 {% if not menu %}<p>No hi ha cap menú per a aquesta setmana.</p>{% else %}
 {% if not editable %}<p>Setmana passada · només consulta</p>{% endif %}<p>Àpats pendents: {{ pending }}</p>
 {% for position, name, status in incomplete %}<p>{% if status == "draft" %}Quantitats provisionals de l’esborrany{% else %}Sense recepta{% endif %}: {{ name }} ({{ position.0|weekday_ca }}, {% if position.1 == 'lunch' %}dinar{% else %}sopar{% endif %})</p>{% endfor %}

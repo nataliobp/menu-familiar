@@ -61,6 +61,7 @@ def browse_dishes(queries: CatalogueQueries, archived: bool, category: str, quer
 def picker_dishes(queries: CatalogueQueries, meal: str, category: str | None, query: str):
     from menus.domain.recommendations import rank_candidates
     candidates = [{"id": dish.id, "name": dish.name, "primary_name": dish.primary_category.name_ca,
+                   "primary_key": dish.primary_category.key,
                    "categories": {dish.primary_category_id, *dish.secondary_categories},
                    "meal_preference": dish.meal_preference, "special_occasion": dish.special_occasion}
                   for dish in queries.dishes(False)]

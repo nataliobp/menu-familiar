@@ -15,6 +15,7 @@ from menus.domain.planning import monday
 from menus.infrastructure.django_planning import MadridClock
 from menus.infrastructure.django_shopping import DjangoShoppingRepository
 from menus.web.common import parse_week, unavailable
+from menus.web.presentation import week_navigation
 
 
 @require_http_methods(["GET"])
@@ -25,14 +26,15 @@ def current_shopping(request):
 @require_http_methods(["GET"])
 def shopping_view(request, week):
     week = parse_week(week)
+    navigation = week_navigation(week, "current_shopping", "shopping_week")
     try:
         with transaction.atomic():
             view = get_shopping(DjangoShoppingRepository(), week)
             if view is None:
-                return render(request, "menus/shopping.html", {"week": week})
+                return render(request, "menus/shopping.html", {"week": week, **navigation})
             menu, state, rows, pending, incomplete, orphans = view
             manual = list(state.manual_items) if state else []
-        return render(request, "menus/shopping.html", {"week": week, "menu": menu, "state": state, "rows": rows, "pending": pending, "incomplete": incomplete, "orphans": orphans, "manual": manual, "editable": week >= monday(MadridClock().today()), "token": str(uuid4())})
+        return render(request, "menus/shopping.html", {"week": week, "menu": menu, "state": state, "rows": rows, "pending": pending, "incomplete": incomplete, "orphans": orphans, "manual": manual, "editable": week >= monday(MadridClock().today()), "token": str(uuid4()), **navigation})
     except (DatabaseError, ValueError, KeyError, ArithmeticError):
         return unavailable()
 

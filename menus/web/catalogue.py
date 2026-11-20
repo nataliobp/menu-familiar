@@ -5,7 +5,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
-from menus.application.catalogue_queries import browse_dishes, get_dish
+from menus.application.catalogue_queries import browse_dishes, get_dish, get_recipe
 from menus.application.dishes import (
     DishConflict, DishReceiptConflict, create_dish, review_dish_creation, set_archived, update_dish,
 )
@@ -17,6 +17,7 @@ from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import MadridClock
 from menus.infrastructure.django_template import DjangoTemplateRepository
 from menus.web.common import MEALS, filter_error, unavailable
+from menus.web.presentation import catalogue_groups, category_options, recipe_read_context
 
 
 @require_http_methods(["GET"])
@@ -34,7 +35,7 @@ def catalogue(request):
             dishes = [] if error else browse_dishes(DjangoCatalogueQueries(), archived, category, query)
         return render(request, "menus/catalogue.html", {
             "dishes": dishes, "archived": archived, "query": query, "category": category,
-            "categories": categories.items(), "error": error,
+            "categories": category_options(categories), "error": error, "groups": catalogue_groups(dishes),
         }, status=400 if error else 200)
     except DatabaseError:
         return unavailable()
@@ -44,12 +45,15 @@ def catalogue(request):
 def dish_detail(request, dish_id):
     try:
         with transaction.atomic():
-            dish = get_dish(DjangoCatalogueQueries(), dish_id)
+            queries = DjangoCatalogueQueries()
+            dish = get_dish(queries, dish_id)
             if dish is None:
                 raise Http404()
             categories = DjangoTemplateRepository().categories()
-            secondary_labels = [categories[key] for key in dish.secondary_categories]
-        return render(request, "menus/dish.html", {"dish": dish, "secondary_labels": secondary_labels})
+            secondary = [(key, categories[key]) for key in dish.secondary_categories]
+            recipe = get_recipe(queries, dish_id)
+        return render(request, "menus/dish.html", {"dish": dish, "secondary": secondary,
+                      **recipe_read_context(recipe)})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
@@ -136,7 +140,7 @@ def dish_edit(request, dish_id=None):
         if values["preference"] not in {"both", *MEALS}:
             field_errors["preference"] = "Selecciona un àpat preferent vàlid."
     return render(request, "menus/dish_edit.html", {
-        "dish": dish, "categories": categories.items(), "values": values, "error": error,
+        "dish": dish, "categories": category_options(categories), "values": values, "error": error,
         "conflict": status == 409, "field_errors": field_errors, "reviewed": reviewed, "new_creation": new_creation,
     }, status=status)
 

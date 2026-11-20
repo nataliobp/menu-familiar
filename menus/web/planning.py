@@ -1,17 +1,20 @@
-from datetime import date, timedelta
+from datetime import timedelta
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.db import DatabaseError, transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from menus.application.catalogue_queries import picker_dishes
 from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, create_menu, get_menu, move_or_undo
-from menus.domain.planning import MAX_WEEK_START, monday
+from menus.domain.planning import monday
 from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 from menus.infrastructure.django_planning import DjangoPlanningRepository, MadridClock
 from menus.web.common import DAYS, MEALS, filter_error, parse_week, unavailable
+from menus.web.presentation import category_options, picker_groups, week_navigation
 
 
 @require_http_methods(["GET"])
@@ -26,24 +29,27 @@ def menu_view(request, week):
     try:
         with transaction.atomic():
             menu = get_menu(repo, week)
-            editable = week >= monday(clock.today())
-            if menu is None:
-                if editable:
-                    template, categories = repo.template()
-                    slots = {position: (categories.get(category, "Lliure") if category else "Lliure") for position, category in template.slots.items()}
-                else:
-                    slots = {(day, meal): "" for day in range(7) for meal in MEALS}
-            else:
+            today = clock.today()
+            editable = week >= monday(today)
+            if menu:
                 slots = menu.slots
+            elif editable:
+                template, categories = repo.template()
+                slots = {position: (key, categories.get(key))
+                         for position, key in template.slots.items()}
+            else:
+                slots = None
         days = []
-        for day, label in enumerate(DAYS):
+        for day, label in enumerate(DAYS) if slots is not None else ():
             meals = []
             for meal in ("lunch", "dinner"):
                 slot = slots[(day, meal)]
-                meals.append((meal, MEALS[meal], slot))
-            days.append((day, label, meals))
+                suggestion = (slot.suggestion if menu else slot) or ("", "")
+                meals.append((meal, MEALS[meal], slot, *suggestion))
+            day_date = week + timedelta(days=day)
+            days.append((day, label, day_date, day_date == today, meals))
         return render(request, "menus/menu.html", {"week": week, "days": days, "menu": menu,
-                      "editable": editable, "week_end": week + timedelta(days=6), "previous": week - timedelta(days=7) if week >= date.min + timedelta(days=7) else None, "next": week + timedelta(days=7) if week <= MAX_WEEK_START - timedelta(days=7) else None})
+                      "editable": editable, **week_navigation(week, "current_menu", "menu_week")})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
@@ -86,7 +92,12 @@ def menu_picker(request, week, day, meal):
             query = request.GET.get("q", "")
             error = filter_error(query, category, categories)
             dishes = [] if error else picker_dishes(DjangoCatalogueQueries(), meal, category, query)
-        return render(request, "menus/picker.html", {"week": week, "day": day, "meal": meal, "action": action, "menu": menu, "dishes": dishes, "categories": categories.items(), "category": category, "query": query, "slot": slot, "day_label": DAYS[day], "meal_label": MEALS[meal], "error": error}, status=400 if error else 200)
+        return render(request, "menus/picker.html", {
+            "week": week, "day": day, "meal": meal, "action": action, "menu": menu,
+            "dishes": dishes, "tiers": picker_groups(dishes, meal, category),
+            "categories": category_options(categories), "category": category, "query": query,
+            "slot": slot, "day_label": DAYS[day], "meal_label": MEALS[meal], "error": error,
+        }, status=400 if error else 200)
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
@@ -96,6 +107,14 @@ def menu_action(request, week, day, meal, action):
     week = parse_week(week)
     if day not in range(7) or meal not in MEALS or action not in ("assign", "replace", "remove", "skip", "reactivate"):
         raise Http404()
+    recovery = {"week": week}
+    picker_filters = None
+    if action in ("assign", "replace") and request.POST.get("from_picker") == "yes":
+        picker_filters = {"action": action, "category": request.POST.get("category", ""),
+                          "q": request.POST.get("q", "")}
+        path = reverse("menu_picker", args=[week.isoformat(), day, meal])
+        recovery.update(picker_url=f"{path}?{urlencode(picker_filters)}",
+                        slot_url=reverse("slot_detail", args=[week.isoformat(), day, meal]))
     try:
         version = int(request.POST.get("version", ""))
         dish_id = int(request.POST.get("dish", "0"))
@@ -107,10 +126,25 @@ def menu_action(request, week, day, meal, action):
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
     except PlanningConflict:
-        return render(request, "menus/action_error.html", {"week": week}, status=409)
+        if picker_filters is not None:
+            recovery.pop("picker_url")
+            try:
+                current = get_menu(DjangoPlanningRepository(), week)
+                state = current.slots[day, meal].state if current else None
+                next_action = {"pending": "assign", "selected": "replace"}.get(state)
+                if next_action:
+                    picker_filters["action"] = next_action
+                    recovery["picker_url"] = f"{path}?{urlencode(picker_filters)}"
+            except (DatabaseError, ValueError, KeyError):
+                pass
+        return render(request, "menus/action_error.html", recovery, status=409)
     except (ValueError, TypeError, KeyError):
-        return render(request, "menus/action_error.html", {"week": week, "invalid": True}, status=400)
-    except (DatabaseError, Rollover):
+        return render(request, "menus/action_error.html", {**recovery, "invalid": True}, status=400)
+    except Rollover:
+        return unavailable()
+    except DatabaseError:
+        if "picker_url" in recovery:
+            return render(request, "menus/action_error.html", {**recovery, "busy": True}, status=503)
         return unavailable()
 
 

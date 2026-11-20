@@ -24,9 +24,9 @@
 </ul>{% else %}
 <p>Recepta pendent</p>{% endif %}{% endif %}
 {% if target_unavailable %}
-  {% if week %}<a href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú de la setmana</a>{% else %}<a href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
+  {% if week %}<a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú de la setmana</a>{% else %}<a class="button" href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
 {% else %}
-<form method="post" action="{% if week %}{% url 'slot_recipe_edit' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_edit' editor_dish_id %}{% endif %}">{% csrf_token %}
+<form class="edit-form" method="post" action="{% if week %}{% url 'slot_recipe_edit' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_edit' editor_dish_id %}{% endif %}">{% csrf_token %}
 <input type="hidden" name="version" value="{{ values.version }}">
 <input type="hidden" name="dish_id" value="{{ editor_dish_id }}"><label for="preparation">Preparació</label>
 <textarea id="preparation" name="preparation" maxlength="10000"{% if values.preparation_error %} aria-invalid="true" aria-describedby="preparation-error"{% endif %}>{{ values.preparation }}</textarea>
@@ -43,13 +43,16 @@
 <input name="quantity" value="{{ line.quantity|default_if_none:'' }}" inputmode="decimal"></label><label>Unitat <select name="unit"><option value="">Sense unitat</option><option value="g" {% if line.unit == 'g' %}selected{% endif %}>g</option><option value="kg" {% if line.unit == 'kg' %}selected{% endif %}>kg</option><option value="ml" {% if line.unit == 'ml' %}selected{% endif %}>ml</option><option value="l" {% if line.unit == 'l' %}selected{% endif %}>l</option><option value="unit" {% if line.unit == 'unit' %}selected{% endif %}>unitats</option></select></label><label>Nota
 <input name="note" value="{{ line.note|default_if_none:'' }}"></label><label>
 <input type="checkbox" name="taste" value="{{ forloop.counter0 }}" {% if line.taste %}checked{% endif %}>Al gust</label>{% if not conflict and not retry_read %}
-<button name="action" value="remove_row:{{ forloop.counter0 }}">Elimina la fila</button>{% endif %}
-</fieldset>{% endfor %}{% if retry_read %}
+<button class="danger" name="action" value="remove_row:{{ forloop.counter0 }}">Elimina la fila</button>{% endif %}
+</fieldset>{% endfor %}
+<div class="toolbar form-actions">
+{% if retry_read %}
 <button name="action" value="retry_read">Torna a obrir la recepta</button>{% elif conflict %}
 <button name="action" value="review">Revisa el valor actual</button>{% else %}
 <button name="action" value="add_row"{% if values.ingredients_error %} aria-describedby="ingredients-error"{% endif %}>Afegeix un ingredient</button>
 <button name="action" value="draft" formaction="{% if week %}{% url 'slot_recipe_draft' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_draft' dish.id %}{% endif %}">Desa l’esborrany</button>
-<button name="action" value="publish" formaction="{% if week %}{% url 'slot_recipe_publish' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_publish' dish.id %}{% endif %}">Publica la recepta</button>
+<button class="primary" name="action" value="publish" formaction="{% if week %}{% url 'slot_recipe_publish' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_publish' dish.id %}{% endif %}">Publica la recepta</button>
 <button name="action" value="review_discard">Cancel·la</button>{% endif %}
-</form>{% if conflict or retry_read %}{% if week %}<a href="{% url 'slot_detail' week|date:'Y-m-d' day meal %}">Cancel·la</a>{% else %}<a href="{% url 'recipe_view' editor_dish_id %}">Cancel·la</a>{% endif %}{% endif %}
+</div>
+</form>{% if conflict or retry_read %}{% if week %}<a class="button" href="{% url 'slot_detail' week|date:'Y-m-d' day meal %}">Cancel·la</a>{% else %}<a class="button" href="{% url 'dish_detail' editor_dish_id %}">Cancel·la</a>{% endif %}{% endif %}
 {% endif %}{% endblock %}

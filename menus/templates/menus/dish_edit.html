@@ -1,4 +1,4 @@
-{% extends "menus/base.html" %}{% block content %}
+{% extends "menus/base.html" %}{% load menus_format %}{% block content %}
 <h1>{% if dish or editing %}Edita el plat{% else %}Nou plat{% endif %}</h1>{% if error %}
 <div role="alert" tabindex="-1" autofocus>
 <p>{{ error }}</p>
@@ -7,9 +7,9 @@
 </div>{% endif %}
 {% if target_unavailable %}
 <p>Nom enviat: {{ values.name }}</p>
-<a href="{% url 'catalogue' %}">Torna al catàleg</a>
+<a class="button" href="{% url 'catalogue' %}">Torna al catàleg</a>
 {% elif retry_read %}
-<form method="post">
+<form class="edit-form" method="post">
   {% csrf_token %}
   <input type="hidden" name="version" value="{{ values.version }}">
   <input type="hidden" name="token" value="{{ values.token }}">
@@ -21,7 +21,7 @@
   <input id="name" name="name" value="{{ values.name }}" maxlength="200">
   <button name="action" value="retry_read">Torna a obrir el formulari</button>
 </form>
-<a href="{% url 'catalogue' %}">Cancel·la</a>
+<a class="button" href="{% url 'catalogue' %}">Cancel·la</a>
 {% else %}
 {% if conflict or reviewed %}
 <p>Nom enviat: {{ values.name }}</p>
@@ -29,10 +29,10 @@
 <p>Categories secundàries enviades: {% for key, label in categories %}{% if key in values.secondary %}{{ label }} {% endif %}{% endfor %}</p>
 <p>Preferència enviada: {% if values.preference == "lunch" %}Dinar{% elif values.preference == "dinner" %}Sopar{% else %}Tots dos{% endif %}{% if values.special %} · Ocasió especial{% endif %}</p>
 {% if dish %}<p>Nom actual: {{ dish.name }}</p>
-<p>Categoria principal actual: {{ dish.primary_category.name_ca }}</p>
+<p>Categoria principal actual: {{ dish.primary_category.name_ca|category_display:dish.primary_category.key }}</p>
 <p>Categories secundàries actuals: {% for key, label in categories %}{% if key in dish.secondary_categories %}{{ label }} {% endif %}{% endfor %}</p>
 <p>Preferència actual: {% if dish.meal_preference == "lunch" %}Dinar{% elif dish.meal_preference == "dinner" %}Sopar{% else %}Tots dos{% endif %}{% if dish.special_occasion %} · Ocasió especial{% endif %}</p>{% endif %}{% endif %}
-<form method="post">{% csrf_token %}
+<form class="edit-form" method="post">{% csrf_token %}
 <input type="hidden" name="version" value="{{ values.version }}">
 <input type="hidden" name="token" value="{{ values.token }}"><label for="name">Nom</label>
 <input id="name" {% if field_errors.name %}aria-invalid="true" aria-describedby="name-error"{% endif %} name="name" value="{{ values.name }}" maxlength="200" required><label for="primary">Categoria principal</label><select id="primary" {% if field_errors.primary %}aria-invalid="true" aria-describedby="primary-error"{% endif %} name="primary">{% for key, label in categories %}<option value="{{ key }}" {% if values.primary == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
@@ -41,9 +41,13 @@
 <input type="checkbox" name="secondary" value="{{ key }}" {% if key in values.secondary %}checked{% endif %}>{{ label }}</label>{% endfor %}
 </fieldset><label for="preference">Àpat preferent</label><select id="preference" {% if field_errors.preference %}aria-invalid="true" aria-describedby="preference-error"{% endif %} name="preference"><option value="both" {% if values.preference == 'both' %}selected{% endif %}>Tots dos</option><option value="lunch" {% if values.preference == 'lunch' %}selected{% endif %}>Dinar</option><option value="dinner" {% if values.preference == 'dinner' %}selected{% endif %}>Sopar</option></select><label>
 <input type="checkbox" name="special" {% if values.special %}checked{% endif %}>Ocasió especial</label>{% for field, detail in field_errors.items %}
-<p id="{{ field }}-error">{{ detail }}</p>{% endfor %}{% if conflict %}
+<p id="{{ field }}-error">{{ detail }}</p>{% endfor %}
+<div class="toolbar form-actions">
+{% if conflict %}
 <button name="action" value="review">Revisa el valor actual</button>{% else %}
-<button>{% if new_creation %}Crea un plat nou{% else %}Desa{% endif %}</button>{% endif %}
-</form><a href="{% url 'catalogue' %}">Cancel·la</a>
+<button class="primary">{% if new_creation %}Crea un plat nou{% else %}Desa{% endif %}</button>{% endif %}
+<a class="button" href="{% if dish %}{% url 'dish_detail' dish.id %}{% else %}{% url 'catalogue' %}{% endif %}">Cancel·la</a>
+</div>
+</form>
 {% endif %}
 {% endblock %}

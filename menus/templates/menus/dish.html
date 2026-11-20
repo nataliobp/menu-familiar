@@ -1,1 +1,25 @@
-{% extends "menus/base.html" %}{% block content %}<h1>{{ dish.name }}</h1><p>Categoria principal: {{ dish.primary_category.name_ca }}</p>{% if secondary_labels %}<p>Categories secundàries: {% for label in secondary_labels %}{{ label }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}<p><a href="{% url 'recipe_view' dish.id %}">Recepta</a></p><p><a href="{% url 'dish_edit' dish.id %}">Edita el plat</a></p><p><a href="{% if dish.archived %}{% url 'dish_archive' dish.id 'restore' %}{% else %}{% url 'dish_archive' dish.id 'archive' %}{% endif %}">{% if dish.archived %}Restaura{% else %}Arxiva{% endif %}</a></p><a href="{% url 'catalogue' %}">Torna als plats</a>{% endblock %}
+{% extends "menus/base.html" %}
+{% block title %}{{ dish.name }} · Menú Familiar{% endblock %}
+{% block content %}
+<a class="button" href="{% url 'catalogue' %}{% if dish.archived %}?archived=1{% endif %}">{% include "menus/components/icon.html" with name="back" only %}Torna als plats</a>
+<h1 class="detail-title">{{ dish.name }}</h1>
+<div class="toolbar detail-actions">
+  <a class="button" href="{% url 'dish_edit' dish.id %}">{% include "menus/components/icon.html" with name="edit" only %}Edita el plat</a>
+  <a class="button" href="{% url 'recipe_edit' dish.id %}">{% include "menus/components/icon.html" with name="book" only %}Edita la recepta</a>
+  {% if dish.archived %}
+    <a class="button" href="{% url 'dish_archive' dish.id 'restore' %}">{% include "menus/components/icon.html" with name="restore" only %}Restaura</a>
+  {% else %}
+    <a class="button danger" href="{% url 'dish_archive' dish.id 'archive' %}">{% include "menus/components/icon.html" with name="archive" only %}Arxiva</a>
+  {% endif %}
+</div>
+<div class="metadata">
+  <span class="pill"><span class="sr-only">Categoria principal</span>{% include "menus/components/category.html" with key=dish.primary_category.key label=dish.primary_category.name_ca only %}</span>
+  {% for key, name in secondary %}
+    <span class="pill secondary"><span class="sr-only">Categoria secundària</span>{% include "menus/components/category.html" with key=key label=name only %}</span>
+  {% endfor %}
+  <span class="pill secondary">{% include "menus/components/meal_preference.html" with value=dish.meal_preference only %}</span>
+  {% if dish.special_occasion %}<span class="pill secondary">{% include "menus/components/icon.html" with name="star" only %}Ocasió especial</span>{% endif %}
+</div>
+{% if dish.archived %}<p class="notice">Plat arxivat</p>{% endif %}
+{% include "menus/components/recipe_content.html" %}
+{% endblock %}
