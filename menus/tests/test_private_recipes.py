@@ -296,6 +296,27 @@ class ImportTests(TestCase):
         self.assertFalse(RecipeRecord.objects.exists())
         self.assertFalse(CatalogueSourceRecord.objects.get(pk=7).rename_applied)
 
+    def test_different_existing_photo_is_preserved_on_preview_and_apply(self):
+        dish = self.dish(101, source_id=1)
+        proposal = Proposal(1, dish.name, dish.name, self.content)
+        original = b"original photo"
+        digest = hashlib.sha256(original).hexdigest()
+        with TemporaryDirectory() as directory:
+            store = PhotoStore(directory)
+            self.apply([proposal], photos={1: digest}, store_photo=lambda key: store.store(key, Photo(digest, original)))
+            storage = Mock()
+            for dry_run in (True, False):
+                result = self.apply([proposal], photos={1: "b" * 64}, dry_run=dry_run, store_photo=storage)
+                self.assertEqual(result[0].photo, "preserved_existing")
+            storage.assert_not_called()
+            with store.open(1, digest) as stored:
+                self.assertEqual(stored.read(), original)
+        self.assertEqual(CatalogueSourceRecord.objects.get(pk=1).photo_digest, digest)
+        version = DishRecord.objects.get(pk=dish.pk).version
+        with self.assertRaises(DishConflict):
+            self.repo.link_photo(1, dish.pk, version, "b" * 64)
+        self.assertEqual(CatalogueSourceRecord.objects.get(pk=1).photo_digest, digest)
+
 
 class ErrorLocaleTests(SimpleTestCase):
     @override_settings(DEBUG=False, ALLOWED_HOSTS=["testserver"])

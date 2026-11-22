@@ -54,7 +54,8 @@ class DjangoPrivateRecipeRepository(DjangoDishRepository):
 
     def link_photo(self, source_id, dish_id, version, digest):
         self.guard_dish(dish_id, version)
-        CatalogueSourceRecord.objects.filter(pk=source_id, dish_id=dish_id).exclude(photo_digest=digest).update(photo_digest=digest)
+        if not CatalogueSourceRecord.objects.filter(pk=source_id, dish_id=dish_id, photo_digest="").update(photo_digest=digest):
+            raise DishConflict()
 
 
 def photo_reference(dish_id):

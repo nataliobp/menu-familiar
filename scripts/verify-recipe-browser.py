@@ -1,4 +1,4 @@
-"""Check a disposable copy of the private V2.3/V2.4 catalogue in Chromium."""
+"""Check a disposable copy of the private recipe catalogue in Chromium."""
 
 import argparse
 import os
@@ -24,6 +24,8 @@ def verify_catalogue(page, origin, sources):
         assert response.ok, source_id
         assert page.locator(".ingredient-list li").count() > 0, source_id
         assert page.locator(".steps li").count() > 0, source_id
+        if source_id == 43:
+            expect(page.get_by_text("Recepta proposada a partir d’una preparació de casa", exact=False)).to_be_visible()
         if has_photo:
             expect(page.locator(".recipe-photo img")).to_have_js_property("naturalWidth", 800)
         else:
@@ -31,8 +33,8 @@ def verify_catalogue(page, origin, sources):
 
 
 def verify_sizes(page, origin, sources, mode, screenshots):
-    photo_id, _ = sources[1]
-    no_photo_id, _ = sources[43]
+    photo_id = next(dish_id for dish_id, has_photo in sources.values() if has_photo)
+    no_photo_id = next(dish_id for dish_id, has_photo in sources.values() if not has_photo)
     for width, height in VIEWPORTS:
         page.set_viewport_size({"width": width, "height": height})
         for dish_id, photo in ((photo_id, True), (no_photo_id, False)):
@@ -52,7 +54,6 @@ def verify_sizes(page, origin, sources, mode, screenshots):
                     assert image.bounding_box()["x"] > preparation.bounding_box()["x"]
                     assert ingredients.bounding_box()["y"] < height
             else:
-                expect(page.get_by_text("Recepta proposada a partir d’una preparació de casa", exact=False)).to_be_visible()
                 expect(page.locator(".recipe-photo")).to_have_count(0)
             for locator in (page.locator("body"), page.locator("main")):
                 assert locator.evaluate("el => el.scrollWidth <= el.clientWidth"), (mode, width, dish_id)
@@ -71,6 +72,7 @@ def verify_sizes(page, origin, sources, mode, screenshots):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("database", type=Path)
+    parser.add_argument("--expected-photos", type=int, default=9, choices=range(1, 57), metavar="COUNT")
     parser.add_argument("--screenshots", type=Path)
     args = parser.parse_args()
     database = args.database.absolute()
@@ -81,7 +83,7 @@ def main():
             "SELECT source_id, dish_id, photo_digest FROM menus_cataloguesourcerecord ORDER BY source_id")}
     connection.close()
     assert set(sources) == set(range(1, 58))
-    assert sum(photo for _, photo in sources.values()) == 9
+    assert sum(photo for _, photo in sources.values()) == args.expected_photos
     os.environ.update(DJANGO_ENV="development", DJANGO_DEBUG="0", DJANGO_SETTINGS_MODULE="config.settings",
                       DJANGO_ALLOWED_HOSTS="127.0.0.1", DJANGO_DB_PATH=str(database),
                       DJANGO_RECIPE_PHOTO_ROOT=str(database.parent / "recipe-photos"))

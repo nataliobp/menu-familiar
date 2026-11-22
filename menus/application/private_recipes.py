@@ -66,7 +66,12 @@ def import_proposals(repo, clock, proposals, legacy_catalogue, photos, dry_run, 
                 recipe = "unchanged" if target.published == proposal.content else "preserved_published"
             photo = "pending"
             if source_id in photos:
-                photo = "unchanged" if target.photo_digest == photos[source_id] else "linked"
+                if target.photo_digest == photos[source_id]:
+                    photo = "unchanged"
+                elif target.photo_digest:
+                    photo = "preserved_existing"
+                else:
+                    photo = "linked"
             if not dry_run:
                 if not target.linked:
                     repo.adopt_source(source_id, dish_id, version)
@@ -77,7 +82,7 @@ def import_proposals(repo, clock, proposals, legacy_catalogue, photos, dry_run, 
                 if recipe == "imported":
                     save_recipe(repo, clock, dish_id, version, proposal.content, publish=True)
                     version += 1
-                if source_id in photos:
+                if photo in {"unchanged", "linked"}:
                     store_photo(source_id)
                     if photo == "linked":
                         repo.link_photo(source_id, dish_id, version, photos[source_id])
