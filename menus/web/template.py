@@ -68,12 +68,12 @@ def template_edit(request, day, meal):
                 messages.success(request, "Plantilla actualitzada")
                 return redirect(template_url)
             except (ValueError, TypeError):
-                error, status = "Selecciona una categoria vàlida.", 400
+                error, status = "Tria una categoria vàlida.", 400
             except TemplateConflict:
                 error, status = "La plantilla ha canviat. Revisa la selecció i torna-ho a provar.", 409
         if enhanced:
             if status == 409:
-                error = "La plantilla ha canviat. Actualitza-la i revisa la selecció."
+                error = "La plantilla ha canviat. Recarrega-la i revisa la selecció."
             return JsonResponse({"error": error}, status=status)
         return render(request, "menus/template_edit.html", {
             "day": DAYS[day], "meal": MEALS[meal], "categories": category_options(categories),

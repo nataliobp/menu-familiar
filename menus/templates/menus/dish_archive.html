@@ -2,7 +2,7 @@
 {% block content %}
 <section data-confirmation>
   <h1 data-confirm-heading>{% if action == 'archive' %}Arxivar aquest plat?{% else %}Restaurar aquest plat?{% endif %}</h1>
-  <p data-confirm-description>{{ dish.name }}{% if action == 'archive' %}. El plat deixarà d’aparèixer al catàleg actiu. Els menús existents es conservaran.{% endif %}</p>
+  <p data-confirm-description>{{ dish.name }}{% if action == 'archive' %}. El plat deixarà d’aparèixer al catàleg actiu. Els àpats planificats es conservaran.{% endif %}</p>
   <form class="toolbar form-actions" method="post" action="{{ request.path }}">
     {% csrf_token %}
     <input type="hidden" name="version" value="{{ dish.version }}">

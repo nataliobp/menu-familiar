@@ -1,6 +1,6 @@
 {% extends "menus/base.html" %}{% load menus_format %}{% block content %}
 <h1>{% if target_changed %}El contingut ha canviat{% else %}Edita la recepta{% if dish %} · {{ dish.name }}{% endif %}{% endif %}</h1>
-{% if not target_unavailable and not retry_read %}<p>Els canvis afecten la recepta compartida. Per a 2 adults.</p>{% endif %}
+{% if not target_unavailable and not retry_read %}<p>La recepta compartida és per a 2 adults.</p>{% endif %}
 {% if error %}
 <div role="alert" tabindex="-1" autofocus>
 
@@ -13,18 +13,18 @@
   {% endif %}{% endfor %}
 </div>{% endif %}{% if conflict or reviewed or target_unavailable %}
 <p>Preparació enviada: {{ values.preparation|linebreaksbr }}</p>
-<ul>{% for line in values.lines %}<li>{{ line.name }} · {{ line.quantity }} {{ line.unit }} · {{ line.note }}{% if line.taste %} · Al gust{% endif %}</li>{% endfor %}
+<ul>{% for line in values.lines %}<li>{{ line.name }} · {{ line.quantity|decimal_ca }} {{ line.unit|unit_ca:line.quantity }} · {{ line.note }}{% if line.taste %} · Al gust{% endif %}</li>{% endfor %}
 </ul>
 {% endif %}{% if conflict or reviewed %}
 <h2>Recepta actual</h2>{% if current_content %}
 <p>{{ current_content.preparation|linebreaksbr }}</p>
 <ul>{% for line in current_content.ingredients %}
-  <li>{{ line.name }} · {% if line.taste %}Al gust{% elif line.quantity %}{{ line.quantity|decimal_ca }}{% else %}Quantitat pendent{% endif %}{% if line.unit %} {% if line.unit == "unit" %}unitats{% else %}{{ line.unit }}{% endif %}{% endif %}{% if line.note %} · {{ line.note }}{% endif %}</li>
+  <li>{{ line.name }} · {% if line.taste %}Al gust{% elif line.quantity %}{{ line.quantity|decimal_ca }}{% else %}Quantitat pendent{% endif %}{% if line.unit %} {{ line.unit|unit_ca:line.quantity }}{% endif %}{% if line.note %} · {{ line.note }}{% endif %}</li>
 {% endfor %}
 </ul>{% else %}
 <p>Recepta pendent</p>{% endif %}{% endif %}
 {% if target_unavailable %}
-  {% if week %}<a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú de la setmana</a>{% else %}<a class="button" href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
+  {% if week %}<a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú setmanal</a>{% else %}<a class="button" href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
 {% else %}
 <form class="edit-form" data-discard-form{% if request.method == "POST" %} data-unsaved{% endif %} method="post" action="{% if week %}{% url 'slot_recipe_edit' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_edit' editor_dish_id %}{% endif %}">{% csrf_token %}
 <input type="hidden" name="version" value="{{ values.version }}">
@@ -48,7 +48,7 @@
 <div class="toolbar form-actions">
 {% if retry_read %}
 <button name="action" value="retry_read">Torna a obrir la recepta</button>{% elif conflict %}
-<button name="action" value="review">Revisa el valor actual</button>{% else %}
+<button name="action" value="review">Revisa la recepta actual</button>{% else %}
 <button name="action" value="add_row"{% if values.ingredients_error %} aria-describedby="ingredients-error"{% endif %}>Afegeix un ingredient</button>
 <button name="action" value="draft" formaction="{% if week %}{% url 'slot_recipe_draft' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_draft' dish.id %}{% endif %}">Desa l’esborrany</button>
 <button class="primary" name="action" value="publish" formaction="{% if week %}{% url 'slot_recipe_publish' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_publish' dish.id %}{% endif %}">Publica la recepta</button>

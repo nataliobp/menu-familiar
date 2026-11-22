@@ -198,9 +198,9 @@ def move_choice(request, week, day, meal):
             target_meal = request.GET["destination_meal"]
             version = int(request.GET.get("version", ""))
         except (KeyError, ValueError):
-            return HttpResponse("Destinació o versió invàlida.", status=400)
+            return HttpResponse("La destinació o la versió no és vàlida.", status=400)
         if target_day not in range(7) or target_meal not in MEALS or (target_day, target_meal) == (day, meal):
-            return HttpResponse("Destinació invàlida.", status=400)
+            return HttpResponse("La destinació no és vàlida.", status=400)
         if version != menu.version:
             return render(request, "menus/action_error.html", {"week": week}, status=409)
         target = menu.slots[target_day, target_meal]

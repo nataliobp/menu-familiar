@@ -55,7 +55,7 @@ class ReviewRegressions(TestCase):
                 url = self.url(f"slot_recipe_{action}", 0, "lunch") if action in {"draft", "publish"} else editor
                 response = self.client.post(url, {"dish_id": self.dish.pk, "version": 1,
                                                   "preparation": "Text de prova", "action": action})
-                self.assertContains(response, "Torna al menú de la setmana", status_code=409)
+                self.assertContains(response, "Torna al menú setmanal", status_code=409)
                 self.assertContains(response, "Text de prova", status_code=409)
                 self.assertNotContains(response, "<form", status_code=409)
                 self.assertEqual(self.state(), before)
@@ -153,7 +153,7 @@ class ReviewRegressions(TestCase):
         save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, content)
         slot = self.client.get(self.url("slot_detail", 0, "lunch"))
         self.assertContains(slot, "Nota sintètica")
-        self.assertContains(slot, "Esborrany")
+        self.assertContains(slot, "Recepta en esborrany")
         shop = self.client.get(self.url("shopping_week"))
         self.assertContains(shop, "Quantitats provisionals")
         self.assertContains(shop, "dilluns, dinar")
@@ -221,7 +221,7 @@ class ReviewRegressions(TestCase):
         self.assertContains(self.client.post(template, data), "La teva selecció: Lliure", status_code=409)
         review = self.client.post(template, {**data, "action": "review"})
         self.assertContains(review, 'name="version" value="2"')
-        self.assertContains(review, "Valor actual: Ous")
+        self.assertContains(review, "Categoria actual: Ous")
         self.assertEqual(self.client.post(template, {**data, "version": 2}).status_code, 302)
 
     def test_shopping_conflict_review_has_current_overlay_and_keeps_requested_check(self):
@@ -273,7 +273,7 @@ class ReviewRegressions(TestCase):
                     recipe_content("Recepta nova", [{"name": "Sal", "taste": True}]))
         before = self.state()
         retried = self.client.post(editor, {**data, "action": "retry_read"})
-        self.assertContains(retried, "Revisa el valor actual", status_code=409)
+        self.assertContains(retried, "Revisa la recepta actual", status_code=409)
         self.assertContains(retried, 'name="version" value="1"', status_code=409)
         self.assertEqual(self.state(), before)
 

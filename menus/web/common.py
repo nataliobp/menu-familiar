@@ -29,7 +29,7 @@ def filter_error(query, category, categories):
     if len(query) > 200:
         return "La cerca admet fins a 200 caràcters."
     if category and category not in categories:
-        return "Selecciona una categoria vàlida."
+        return "Tria una categoria vàlida."
     return None
 
 def command_done(request, route, **kwargs):

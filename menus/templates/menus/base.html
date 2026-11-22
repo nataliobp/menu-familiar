@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Menú familiar{% endblock %}</title>
+  <title>{% block title %}Menú Familiar{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'menus/app.css' %}">
   <script src="{% static 'menus/app.js' %}" defer></script>
 </head>
@@ -20,7 +20,7 @@
     <div class="nav-inner">
       <a href="{% if week %}{% url 'menu_week' week|date:'Y-m-d' %}{% else %}{% url 'current_menu' %}{% endif %}"
          {% if "/menu/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="calendar" only %}Menú setmanal</a>
-      <a href="{% url 'weekly_template' %}{% if week %}?week={{ week|date:'Y-m-d' }}{% endif %}" {% if "/plantilla/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="grid" only %}Plantilla</a>
+      <a aria-label="Plantilla setmanal" href="{% url 'weekly_template' %}{% if week %}?week={{ week|date:'Y-m-d' }}{% endif %}" {% if "/plantilla/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="grid" only %}Plantilla</a>
       <a href="{% url 'catalogue' %}" {% if "/plats/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="plate" only %}Plats</a>
       <a href="{% if week %}{% url 'shopping_week' week|date:'Y-m-d' %}{% else %}{% url 'current_shopping' %}{% endif %}"
          {% if "/compra/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="basket" only %}Llista de la compra</a>
@@ -43,7 +43,7 @@
   <template id="confirmation-failure">
     <section>
       <h1 data-confirm-heading></h1>
-      <p data-confirm-description>Actualitza la pàgina i torna-ho a provar.</p>
+      <p data-confirm-description>Recarrega la pàgina i torna-ho a provar.</p>
       <div class="toolbar">
         <button type="button" data-confirm-cancel>Cancel·la</button>
         <a class="button" data-confirm-reload>Revisa el contingut actual</a>

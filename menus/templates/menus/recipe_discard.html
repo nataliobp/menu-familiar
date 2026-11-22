@@ -1,5 +1,5 @@
 {% extends "menus/base.html" %}{% block content %}
-<h1>Descarta els canvis?</h1>
+<h1>Descartar els canvis?</h1>
 <p>Els canvis que no hagis desat es perdran.</p>
 <form class="toolbar form-actions" method="post" action="{% if week %}{% url 'slot_recipe_edit' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_edit' dish.id %}{% endif %}">{% csrf_token %}
 <input type="hidden" name="version" value="{{ values.version }}">

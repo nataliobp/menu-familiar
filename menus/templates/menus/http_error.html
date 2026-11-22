@@ -1,0 +1,7 @@
+{% extends "menus/base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+{% if detail %}<p>{{ detail }}</p>{% endif %}
+<p><a href="{% url 'current_menu' %}">Torna al menú setmanal</a></p>
+{% endblock %}

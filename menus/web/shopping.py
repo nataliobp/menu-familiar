@@ -39,6 +39,19 @@ def shopping_view(request, week):
         return unavailable()
 
 
+def shopping_target_name(data, rows, manual, orphans):
+    if data["id"]:
+        return next((item.name for item in manual if str(item.id) == data["id"]), "Producte de la llista")
+    if data["key"]:
+        key = data["key"], data["family"]
+        for row in rows:
+            if row["key"] == key:
+                return row["name"]
+        return next((item.last_name for item in orphans if (item.ingredient_key, item.family) == key),
+                    "Ingredient de la llista")
+    return ""
+
+
 @require_POST
 def shopping_action(request, week, action):
     week = parse_week(week)
@@ -75,7 +88,7 @@ def shopping_action(request, week, action):
             )
             return render(request, "menus/shopping_error.html", {
                 "week": week, "action": action, "data": data, "reviewed": True,
-                "new_creation": new_creation,
+                "new_creation": new_creation, "target_name": shopping_target_name(data, rows, manual, orphans),
                 "current_rows": rows, "current_manual": manual, "target_missing": target_missing,
                 "orphans": orphans, "menu_version": menu.version,
                 "overlay_version": state.version if state else 0,
@@ -126,9 +139,11 @@ def shopping_action(request, week, action):
         error = ("La sol·licitud ja es va fer servir amb altres dades. Revisa la llista abans de continuar."
                  if isinstance(conflict, ShoppingReceiptConflict) else
                  "El contingut ha canviat. Revisa les dades abans de tornar-ho a provar.")
+        orphans = current_view[-1] if current_view else ()
         return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
-                      "error": error, "conflict": True,
-                      "current_rows": current_rows, "current_manual": current_manual, "orphans": current_view[-1] if current_view else ()}, status=409)
+                      "error": error, "conflict": True, "orphans": orphans,
+                      "target_name": shopping_target_name(data, current_rows, current_manual, orphans),
+                      "current_rows": current_rows, "current_manual": current_manual}, status=409)
     except (ValueError, TypeError, KeyError):
         return render(request, "menus/shopping_error.html", {"week": week, "action": action, "data": data,
                       "error": "Revisa les dades del producte.", "menu_version": request.POST.get("menu_version", ""),
@@ -148,7 +163,7 @@ def shopping_form(request, week, action, item_id=None):
         raise Http404()
     if request.method == "POST":
         if item_id is not None and request.POST.get("id") != str(item_id):
-            return HttpResponse("Producte invàlid.", status=400)
+            return HttpResponse("El producte no és vàlid.", status=400)
         return shopping_action(request, week.isoformat(), action)
     try:
         with transaction.atomic():

@@ -32,7 +32,7 @@
         <button type="submit" name="category" value="{{ key }}" class="category-choice">{% include "menus/components/category.html" with key=key label=label only %}</button>
       {% endfor %}
     </div>
-    <a class="button" href="{{ request.get_full_path }}" data-template-reload hidden>Actualitza la plantilla</a>
+    <a class="button" href="{{ request.get_full_path }}" data-template-reload hidden>Recarrega la plantilla</a>
   </form>
 </template>
 {% endblock %}

@@ -38,3 +38,10 @@ def preparation_steps(text):
 def recipe_quantity_ca(value):
     quantity = decimal_ca(value)
     return quantity.rstrip("0").rstrip(",") if "," in quantity else quantity
+
+
+@register.filter
+def unit_ca(unit, quantity=None):
+    if unit == "unit":
+        return "unitat" if recipe_quantity_ca(quantity) == "1" else "unitats"
+    return unit if unit in {"g", "kg", "ml", "l"} else ""

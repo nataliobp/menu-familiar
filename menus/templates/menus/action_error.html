@@ -4,6 +4,6 @@
 <p class="notice">{% if busy %}El servei no està disponible temporalment. Torna-ho a provar.{% else %}Revisa el contingut actual abans de tornar a fer el canvi.{% endif %}</p>
 <div class="toolbar">
 {% if picker_url %}<a class="button primary" data-recovery href="{{ picker_url }}">Torna a la tria de plats</a>{% endif %}{% if slot_url %}<a class="button" data-recovery href="{{ slot_url }}">Revisa l’àpat</a>{% endif %}
-{% if week %}<a href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú de la setmana</a>{% else %}<a href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
+{% if week %}<a href="{% url 'menu_week' week|date:'Y-m-d' %}">Torna al menú setmanal</a>{% else %}<a href="{% url 'catalogue' %}">Torna al catàleg de plats</a>{% endif %}
 </div>
 {% endblock %}

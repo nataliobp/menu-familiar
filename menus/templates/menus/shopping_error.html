@@ -1,10 +1,10 @@
-{% extends "menus/base.html" %}{% block content %}
+{% extends "menus/base.html" %}{% load menus_format %}{% block content %}
 <h1>Revisa les dades</h1>
 <p role="alert">{{ error }}</p>{% if conflict or reviewed %}
-<p>Dades enviades: {{ data.name }} {{ data.quantity }} {{ data.unit }} {{ data.key }} {{ data.family }} {% if data.id %}· Producte {{ data.id }}{% endif %}{% if data.checked == "1" %} · Marca com a comprat{% elif data.checked == "0" %} · Desmarca{% endif %}</p>
+<p>Dades enviades: {% firstof data.name target_name %} {{ data.quantity|decimal_ca }} {% firstof data.unit|unit_ca:data.quantity data.family|unit_ca:data.quantity %}{% if data.checked == "1" %} · Marca com a comprat{% elif data.checked == "0" %} · Desmarca{% endif %}</p>
 <h2>Llista actual</h2>
-<ul>{% for row in current_rows %}<li>{{ row.name }} · {{ row.quantity|default_if_none:"Al gust" }} {% if row.key.1 == "unit" %}unitats{% else %}{{ row.key.1 }}{% endif %}{% if row.overlay.adjusted_quantity %} · Ajustat: {{ row.overlay.adjusted_quantity }}{% endif %}{% if row.overlay.checked %} · Comprat{% endif %}</li>{% endfor %}{% for item in current_manual %}<li>{{ item.name }} {{ item.quantity|default_if_none:"" }} {% if item.unit == "unit" %}unitats{% else %}{{ item.unit|default_if_none:"" }}{% endif %}{% if item.checked %} · Comprat{% endif %}</li>{% endfor %}
-{% for orphan in orphans %}<li>{{ orphan.last_name }} · Ajustat: {{ orphan.adjusted_quantity }}</li>{% endfor %}
+<ul>{% for row in current_rows %}<li>{{ row.name }} · {% if row.quantity is None %}Al gust{% else %}{{ row.quantity|decimal_ca }} {{ row.key.1|unit_ca:row.quantity }}{% endif %}{% if row.overlay.adjusted_quantity %} · Ajustat: {{ row.overlay.adjusted_quantity|decimal_ca }}{% endif %}{% if row.overlay.checked %} · Comprat{% endif %}</li>{% endfor %}{% for item in current_manual %}<li>{{ item.name }} {{ item.quantity|decimal_ca }} {{ item.unit|unit_ca:item.quantity }}{% if item.checked %} · Comprat{% endif %}</li>{% endfor %}
+{% for orphan in orphans %}<li>{{ orphan.last_name }} · Ajustat: {{ orphan.adjusted_quantity|decimal_ca }}</li>{% endfor %}
 </ul>{% endif %}
 {% if conflict %}
 

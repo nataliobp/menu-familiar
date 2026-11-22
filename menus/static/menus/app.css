@@ -249,6 +249,10 @@ body:has(.sheet[open]) main { overflow: hidden; }
 .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; padding: 5px 9px; background: var(--soft); color: var(--primary-dark); font-size: 13px; }
 .pill.secondary { background: #eef0e9; color: var(--muted); }
 .pill .icon { width: 16px; height: 16px; }
+.recipe-photo { margin: 12px 0; max-width: 320px; }
+.recipe-photo img { display: block; width: 100%; height: auto; border-radius: 12px; }
+.recipe-photo figcaption { margin: 4px 0 0; }
+.recipe-note { margin: 12px 0 0; }
 .recipe-body { display: grid; gap: 12px; margin-bottom: 16px; }
 .panel, .shopping-row, .edit-form {
   min-width: 0;
@@ -327,6 +331,8 @@ legend { font-weight: 650; }
   .sheet-handle { display: none; }
   .category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .category-choice { min-height: 64px; }
+  .recipe-body:has(.recipe-photo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, .8fr); }
+  .recipe-photo { grid-column: 3; grid-row: 1; margin: 0; }
   .recipe-body { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .catalogue-groups { columns: 2; column-gap: 16px; }
   .catalogue-groups > section { width: 100%; display: inline-block; break-inside: avoid; }

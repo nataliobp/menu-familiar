@@ -55,11 +55,25 @@ def validate_content(content, published=False):
     if (not isinstance(content, dict) or type(content.get("schema_version")) is not int
             or content["schema_version"] != 1 or not isinstance(content.get("ingredients"), list)):
         raise ValueError("Invalid recipe schema")
+    proposal = content.get("proposal")
+    if "proposal" in content and (
+        not published or not isinstance(proposal, dict)
+        or set(proposal) != {"servings", "provenance", "prep_minutes", "cook_minutes", "notes"}
+        or type(proposal["servings"]) is not int or proposal["servings"] != 2
+        or proposal["provenance"] not in ("generated_draft", "user_adapted")
+        or any(type(proposal[key]) is not int or not 0 <= proposal[key] <= 1440
+               for key in ("prep_minutes", "cook_minutes"))
+        or not isinstance(proposal["notes"], str) or len(proposal["notes"]) > 500
+    ):
+        raise ValueError("Invalid proposal metadata")
     try:
         lines = [{"name": item["name"], "quantity": "" if item["quantity"] is None else item["quantity"],
                   "unit": "" if item["unit"] is None else item["unit"], "note": item["note"],
                   "taste": item["taste"]} for item in content["ingredients"]]
-        if recipe_content(content["preparation"], lines, published) != content:
+        canonical = recipe_content(content["preparation"], lines, published)
+        if proposal is not None:
+            canonical["proposal"] = proposal
+        if canonical != content:
             raise ValueError("Invalid persisted recipe")
     except (TypeError, KeyError, AttributeError) as exc:
         raise ValueError("Invalid persisted recipe") from exc

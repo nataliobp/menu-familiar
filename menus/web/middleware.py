@@ -8,7 +8,12 @@ class DataIntegrityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        return self.get_response(request)
+        response = self.get_response(request)
+        if response.status_code == 405 and not response.content:
+            response.content = render(request, "menus/http_error.html", {
+                "heading": "Aquesta acció no està disponible",
+            }).content
+        return response
 
     def process_exception(self, request, exception):
         if isinstance(exception, (DataIntegrityError, DatabaseError)):

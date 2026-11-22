@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 
 from menus.domain.catalogue import CatalogueDish
-from menus.domain.categories import CATEGORY_KEYS_BY_NAME
+from menus.domain.categories import CATEGORY_KEYS_BY_NAME, canonical_category_name
 
 
 class InvalidCatalogue(ValueError):
@@ -36,7 +36,8 @@ def read_catalogue(path: Path) -> list[CatalogueDish]:
                 ids.add(dish_id)
                 if not row["name_ca"].strip() or len(row["name_ca"]) > 200:
                     invalid(number, "name_ca", "invalid")
-                if row["primary_category"] not in CATEGORY_KEYS_BY_NAME:
+                primary = canonical_category_name(row["primary_category"])
+                if primary not in CATEGORY_KEYS_BY_NAME:
                     invalid(number, "primary_category", "unknown")
                 if row["meal_preference"] not in {"lunch", "dinner", "both"}:
                     invalid(number, "meal_preference", "invalid")
@@ -44,11 +45,11 @@ def read_catalogue(path: Path) -> list[CatalogueDish]:
                     invalid(number, "special_occasion", "invalid")
                 if row["recipe_status"] != "pending":
                     invalid(number, "recipe_status", "unsupported")
-                categories = [value.strip() for value in row["secondary_categories"].split(",")] if row["secondary_categories"] else []
+                categories = [canonical_category_name(value.strip()) for value in row["secondary_categories"].split(",")] if row["secondary_categories"] else []
                 if (any(value not in CATEGORY_KEYS_BY_NAME for value in categories)
-                        or len(categories) != len(set(categories)) or row["primary_category"] in categories):
+                        or len(categories) != len(set(categories)) or primary in categories):
                     invalid(number, "secondary_categories", "invalid")
-                dishes.append(CatalogueDish(dish_id, row["name_ca"], row["primary_category"], frozenset(categories), row["meal_preference"], row["special_occasion"] == "true"))
+                dishes.append(CatalogueDish(dish_id, row["name_ca"], primary, frozenset(categories), row["meal_preference"], row["special_occasion"] == "true"))
     except (csv.Error, UnicodeError) as exc:
         raise InvalidCatalogue("row=unknown field=csv code=invalid") from exc
     if not dishes:

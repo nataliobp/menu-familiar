@@ -1,14 +1,22 @@
 {% load menus_format %}
-{% if recipe_status == "published" %}
+{% if content.proposal %}
+  <p class="hint">Recepta proposada{% if content.proposal.provenance == "user_adapted" %} a partir d’una preparació de casa{% endif %}, pendent de validar.{% if unpublished_changes %} Hi ha canvis sense publicar.{% endif %}</p>
+{% elif recipe_status == "published" %}
   <p class="hint">Recepta publicada{% if unpublished_changes %} · Hi ha canvis sense publicar.{% endif %}</p>
 {% elif recipe_status == "draft" %}
-  <p class="notice">Esborrany · Recepta incompleta</p>
+  <p class="notice">Recepta en esborrany</p>
 {% else %}
   <p class="notice">Recepta pendent</p>
 {% endif %}
 <div class="recipe-body">
+{% if photo_url %}
+  <figure class="recipe-photo">
+    <img src="{{ photo_url }}" width="800" height="600" alt="Presentació de {{ dish.name }}" decoding="async">
+    <figcaption class="hint">Imatge generada</figcaption>
+  </figure>
+{% endif %}
   <section class="panel">
-    <h2>Ingredients <small>· 2 persones</small></h2>
+    <h2>Ingredients <small>· 2 adults</small></h2>
     {% if content.ingredients %}
       <ul class="ingredient-list">
         {% for line in content.ingredients %}
@@ -17,10 +25,8 @@
             <strong>
               {% if line.taste %}Al gust
               {% elif line.quantity %}
-                {% with amount=line.quantity|recipe_quantity_ca %}
-                  {{ amount }} {% if line.unit == 'unit' %}{% if amount == '1' %}unitat{% else %}unitats{% endif %}{% else %}{{ line.unit }}{% endif %}
-                {% endwith %}
-              {% else %}Quantitat pendent{% if line.unit %} · {% if line.unit == 'unit' %}unitats{% else %}{{ line.unit }}{% endif %}{% endif %}
+                {{ line.quantity|recipe_quantity_ca }} {{ line.unit|unit_ca:line.quantity }}
+              {% else %}Quantitat pendent{% if line.unit %} · {{ line.unit|unit_ca }}{% endif %}
               {% endif %}
             </strong>
           </li>
@@ -30,10 +36,14 @@
   </section>
   <section class="panel">
     <h2>Preparació</h2>
+    {% if content.proposal %}
+      <p class="hint">Preparació: {{ content.proposal.prep_minutes }} min{% if content.proposal.cook_minutes %} · Cocció: {{ content.proposal.cook_minutes }} min{% endif %}</p>
+    {% endif %}
     {% with steps=content.preparation|preparation_steps %}
       {% if steps %}
         <ol class="steps">{% for step in steps %}<li>{{ step }}</li>{% endfor %}</ol>
-      {% else %}<p class="hint">Encara no hi ha cap mètode de preparació.</p>{% endif %}
+      {% else %}<p class="hint">Encara no hi ha instruccions de preparació.</p>{% endif %}
     {% endwith %}
+    {% if content.proposal.notes %}<p class="hint recipe-note">{{ content.proposal.notes }}</p>{% endif %}
   </section>
 </div>

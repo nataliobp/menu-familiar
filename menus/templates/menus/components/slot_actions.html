@@ -1,7 +1,7 @@
 <div class="{% if in_sheet %}action-list{% else %}toolbar{% endif %}">
   {% if slot.state == 'selected' %}
     {% if detail_url %}
-      <a class="button" href="{{ detail_url }}">{% include "menus/components/icon.html" with name="book" only %}Veure el plat</a>
+      <a class="button" href="{{ detail_url }}">{% include "menus/components/icon.html" with name="book" only %}Mostra el plat</a>
     {% endif %}
     <a class="button" href="{% url 'menu_picker' week|date:'Y-m-d' day meal %}?action=replace">{% include "menus/components/icon.html" with name="swap" only %}Canvia el plat</a>
     <a class="button" href="{% url 'move_choice' week|date:'Y-m-d' day meal %}">{% include "menus/components/icon.html" with name="swap" only %}Mou o intercanvia</a>

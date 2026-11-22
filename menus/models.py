@@ -2,6 +2,7 @@
 
 from menus.infrastructure.orm_models import (  # noqa: F401
     CategoryRecord,
+    CatalogueSourceRecord,
     CreationReceipt,
     DishRecord,
     GeneratedOverlayRecord,

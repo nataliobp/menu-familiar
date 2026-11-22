@@ -54,6 +54,9 @@ if not database_path:
     raise ImproperlyConfigured("DJANGO_DB_PATH is required")
 if not Path(database_path).is_absolute():
     raise ImproperlyConfigured("DJANGO_DB_PATH must be absolute")
+RECIPE_PHOTO_ROOT = Path(os.environ.get("DJANGO_RECIPE_PHOTO_ROOT", Path(database_path).parent / "recipe-photos"))
+if not RECIPE_PHOTO_ROOT.is_absolute():
+    raise ImproperlyConfigured("DJANGO_RECIPE_PHOTO_ROOT must be absolute")
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": database_path}}
 test_database_path = os.environ.get("DJANGO_TEST_DB_PATH")
 if test_database_path:
@@ -64,6 +67,7 @@ if test_database_path:
         raise ImproperlyConfigured("DJANGO_TEST_DB_PATH must be a new temporary path in development mode")
     DATABASES["default"]["TEST"] = {"NAME": test_database_path}
 LANGUAGE_CODE = "ca"
+CSRF_FAILURE_VIEW = "menus.web.errors.csrf_failure"
 TIME_ZONE = "Europe/Madrid"
 USE_I18N = True
 USE_TZ = True

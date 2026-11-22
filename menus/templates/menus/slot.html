@@ -1,7 +1,7 @@
 {% extends "menus/base.html" %}
 {% block title %}{{ day_label }} · {{ meal_label }}{% endblock %}
 {% block content %}
-<a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">{% include "menus/components/icon.html" with name="back" only %}Torna al menú</a>
+<a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">{% include "menus/components/icon.html" with name="back" only %}Torna al menú setmanal</a>
 <p class="hint detail-title">{{ day_label }} · {{ meal_label }}</p>
 {% if slot.state == 'selected' %}
   <h1>{{ slot.dish.name }}</h1>
@@ -20,7 +20,7 @@
     </div>
     <template id="slot-actions">{% include "menus/components/slot_actions.html" with in_sheet=True detail_url="" %}</template>
     <div data-sheet-fallback>{% include "menus/components/slot_actions.html" %}</div>
-  {% else %}<p class="notice">Setmana passada · només consulta</p>{% endif %}
+  {% else %}<p class="notice">Setmana passada · només de consulta</p>{% endif %}
   {% include "menus/components/recipe_content.html" with recipe_status=slot.dish.recipe_status content=slot.dish.recipe_content %}
 {% else %}
   <h1>{% if slot.state == 'skipped' %}Omès{% else %}Pendent{% endif %}</h1>

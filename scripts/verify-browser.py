@@ -37,7 +37,7 @@ def verify(page, other, origin, week, dish_id, long_id, long_name):
     assert page.get_by_text("Recepta publicada", exact=True).count() > 0
     other.locator("#preparation").fill("Canvi de la segona pestanya")
     other.get_by_role("button", name="Desa l’esborrany").click()
-    other.get_by_role("button", name="Revisa el valor actual").click()
+    other.get_by_role("button", name="Revisa la recepta actual").click()
     assert other.url == editor
     assert other.locator("#preparation").input_value() == "Canvi de la segona pestanya"
     other.get_by_role("button", name="Desa l’esborrany").click()
@@ -88,10 +88,10 @@ def verify(page, other, origin, week, dish_id, long_id, long_name):
     expect(page.get_by_role("heading", name="Eliminar el producte?")).to_be_visible()
     page.get_by_role("link", name="Cancel·la").click()
     expect(page.get_by_text("Pa de prova", exact=True)).to_be_visible()
-    page.get_by_role("link", name="Menú setmanal").click()
+    page.get_by_role("link", name="Menú setmanal", exact=True).click()
     assert page.url == menu
 
-    page.get_by_role("link", name="Plantilla", exact=True).click()
+    page.get_by_role("link", name="Plantilla setmanal", exact=True).click()
     cell = page.locator(".template-slot").first
     cell.click()
     page.get_by_label("Categoria suggerida").select_option("fish")
@@ -219,7 +219,7 @@ def verify_v2(page, other, origin, week, today, dish_id, long_id, long_name):
         other.get_by_role("dialog").get_by_role("button", name="Peix").click()
     assert other.get_by_role("alert").is_visible()
     assert other.get_by_role("dialog").get_by_role("button", name="Peix").is_disabled()
-    other.get_by_role("link", name="Actualitza la plantilla").click()
+    other.get_by_role("link", name="Recarrega la plantilla").click()
     assert other_cell.get_attribute("data-category") == "salads"
     cell.click()
     with page.expect_response(lambda res: res.url.split("?")[0].endswith("/plantilla/0/lunch/") and res.status == 200):
@@ -244,13 +244,13 @@ def verify_v2(page, other, origin, week, today, dish_id, long_id, long_name):
     page.goto(f"{origin}/menu/{historic}/")
     assert page.locator(".week .slot").count() == 14
     page.locator(".week .slot").first.click()
-    assert page.get_by_text("Setmana passada · només consulta").is_visible()
+    assert page.get_by_text("Setmana passada · només de consulta").is_visible()
     assert page.get_by_role("link", name="Edita la recepta compartida").count() == 0
 
     page.goto(menu)
     page.locator(".week .slot").first.click()
     meal_actions = page.get_by_role("dialog", name="Dilluns · Dinar")
-    assert meal_actions.get_by_role("link", name="Veure el plat").is_visible()
+    assert meal_actions.get_by_role("link", name="Mostra el plat").is_visible()
     capture("meal-actions")
     meal_actions.get_by_role("link", name="Mou o intercanvia").click()
     page.get_by_role("button", name=f"Diumenge · Sopar · {long_name}").click()
@@ -304,7 +304,7 @@ def verify_v2(page, other, origin, week, today, dish_id, long_id, long_name):
     assert page.get_by_role("heading", name="Cereals").count() == 1
     no_overflow(390)
     capture("catalogue")
-    page.get_by_role("link", name="Arxivats", exact=True).click()
+    page.get_by_role("link", name="Plats arxivats", exact=True).click()
     assert page.locator(".list-row").count() == 1
     page.locator(".list-row").click()
     page.get_by_role("button", name="Restaura", exact=True).click()
@@ -440,14 +440,14 @@ def verify_virtual(page, other, origin, current_week):
     expect(other.get_by_role("alert").filter(has_text="El contingut ha canviat")).to_be_visible()
     assert saved_version() == 2
 
-    page.get_by_role("link", name="Plantilla", exact=True).click()
+    page.get_by_role("link", name="Plantilla setmanal", exact=True).click()
     assert f"week={future}" in page.url
     for category, expected in (("Peix", "Peix"), ("Lliure", None), ("Llegums", "Llegums")):
         page.locator(".template-slot").nth(2).click()
         dialog = page.get_by_role("dialog", name="Dimarts · Dinar")
         dialog.get_by_role("button", name=category, exact=True).click()
         expect(dialog).to_be_hidden()
-        page.get_by_role("link", name="Menú setmanal").click()
+        page.get_by_role("link", name="Menú setmanal", exact=True).click()
         assert page.url == menu
         expect(slot).to_contain_text("Arròs de prova")
         expect(slot.locator(".slot-suggestion")).to_have_count(0)
@@ -458,8 +458,8 @@ def verify_virtual(page, other, origin, current_week):
         else:
             expect(pending).to_have_text(expected)
         page.goto(menu)
-        page.get_by_role("link", name="Plantilla", exact=True).click()
-    page.get_by_role("link", name="Menú setmanal").click()
+        page.get_by_role("link", name="Plantilla setmanal", exact=True).click()
+    page.get_by_role("link", name="Menú setmanal", exact=True).click()
     slot.click()
     page.get_by_role("link", name="Retira el plat").click()
     confirmation = page.get_by_role("dialog", name="Retirar el plat?")

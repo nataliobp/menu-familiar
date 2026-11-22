@@ -7,7 +7,7 @@
 </div>{% endif %}
 {% if target_unavailable %}
 <p>Nom enviat: {{ values.name }}</p>
-<a class="button" href="{% url 'catalogue' %}">Torna al catàleg</a>
+<a class="button" href="{% url 'catalogue' %}">Torna al catàleg de plats</a>
 {% elif retry_read %}
 <form class="edit-form" method="post">
   {% csrf_token %}
@@ -44,7 +44,7 @@
 <p id="{{ field }}-error">{{ detail }}</p>{% endfor %}
 <div class="toolbar form-actions">
 {% if conflict %}
-<button name="action" value="review">Revisa el valor actual</button>{% else %}
+<button name="action" value="review">Revisa les dades actuals</button>{% else %}
 <button class="primary">{% if new_creation %}Crea un plat nou{% else %}Desa{% endif %}</button>{% endif %}
 {% if dish %}{% url 'dish_detail' dish.id as discard_url %}{% else %}{% url 'catalogue' as discard_url %}{% endif %}
 <a class="button" data-confirm-template="discard-edits" href="{{ discard_url }}">Cancel·la</a>

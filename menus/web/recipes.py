@@ -15,6 +15,7 @@ from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import DjangoPlanningRepository, MadridClock
 from menus.web.common import MEALS, parse_week, unavailable
+from menus.web.photos import recipe_photo_url
 from menus.web.presentation import recipe_read_context
 
 
@@ -26,10 +27,11 @@ def recipe_view(request, dish_id):
             if not dish:
                 raise Http404()
             recipe = get_recipe(DjangoCatalogueQueries(), dish_id)
+            photo_url = recipe_photo_url(dish_id)
         context = recipe_read_context(recipe)
     except (DatabaseError, ValueError):
         return unavailable()
-    return render(request, "menus/recipe.html", {"dish": dish, **context})
+    return render(request, "menus/recipe.html", {"dish": dish, "photo_url": photo_url, **context})
 
 
 def posted_recipe(request):
@@ -121,13 +123,13 @@ def edit_recipe(request, fields, context, dish_id, submitted_dish_id, intent):
         lines = values["lines"]
         actions = request.POST.getlist("action")
         if len(actions) > 1:
-            return HttpResponse("Acció invàlida.", status=400)
+            return HttpResponse("L’acció no és vàlida.", status=400)
         posted_action = actions[0] if actions else None
         if intent and posted_action is not None and posted_action != intent:
-            return HttpResponse("Acció invàlida.", status=400)
+            return HttpResponse("L’acció no és vàlida.", status=400)
         action = intent or posted_action
         if action in ("draft", "publish") and intent is None:
-            return HttpResponse("Acció invàlida.", status=400)
+            return HttpResponse("L’acció no és vàlida.", status=400)
         if action == "review_discard":
             return render(request, "menus/recipe_discard.html", {"dish": dish, "values": values, "week": week, "day": day, "meal": meal})
         if action == "review":
@@ -151,7 +153,7 @@ def edit_recipe(request, fields, context, dish_id, submitted_dish_id, intent):
                     raise ValueError()
                 lines.pop(index)
             except (ValueError, IndexError):
-                error, status = "Fila invàlida.", 400
+                error, status = "La fila no és vàlida.", 400
         elif action in ("draft", "publish"):
             try:
                 publish = action == "publish"
@@ -186,7 +188,7 @@ def edit_recipe(request, fields, context, dish_id, submitted_dish_id, intent):
             except (DatabaseError, Rollover):
                 error, status = "No s’ha pogut desar. Revisa les dades abans de tornar-ho a provar.", 503
         else:
-            error, status = "Acció invàlida.", 400
+            error, status = "L’acció no és vàlida.", 400
     else:
         lines = [{**line, "quantity": (line["quantity"] or "").replace(".", ",")}
                  for line in saved_content["ingredients"]] if saved_content else []

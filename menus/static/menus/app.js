@@ -105,7 +105,7 @@ if (sheet?.showModal) {
             const result = isJson ? await response.json() : {};
             feedback.textContent = result.error || "No s’ha pogut desar la categoria. Torna-ho a provar.";
         } catch {
-            feedback.textContent = "No s’ha pogut confirmar el desament. Actualitza la plantilla per comprovar-lo o torna-ho a provar.";
+            feedback.textContent = "No s’ha pogut confirmar el desament. Recarrega la plantilla per comprovar si s’ha desat o torna-ho a provar.";
             reload.hidden = false;
         } finally {
             busy = closeButton.disabled = false;
@@ -385,7 +385,7 @@ document.addEventListener("submit", async (event) => {
         }
     } catch {
         unlockCommand();
-        showCommandError(area, "No s’ha pogut confirmar el desament. Actualitza la pàgina per comprovar-lo o torna-ho a provar.");
+        showCommandError(area, "No s’ha pogut confirmar el desament. Recarrega la pàgina per comprovar si s’ha desat o torna-ho a provar.");
     } finally {
         clearTimeout(timeout);
     }

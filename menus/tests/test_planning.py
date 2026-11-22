@@ -149,7 +149,7 @@ class PlanningTests(TestCase):
         url = reverse("recipe_edit", args=[self.dish.pk])
         payload = {"version": 1, "preparation": "Text encara no desat", "name": ["Ingredient"], "quantity": ["12"], "unit": ["g"], "note": [""], "action": "review_discard"}
         response = self.client.post(url, payload)
-        self.assertContains(response, "Descarta els canvis?")
+        self.assertContains(response, "Descartar els canvis?")
         payload["action"] = "continue"
         response = self.client.post(url, payload)
         self.assertContains(response, "Text encara no desat")

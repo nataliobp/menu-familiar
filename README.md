@@ -113,6 +113,10 @@ Run this as your regular user from a terminal. The script requests sudo for Dock
 
 Install Playwright and Chromium in a QA environment using `python -m pip install playwright` and `python -m playwright install chromium`. Then run `python scripts/verify-browser.py` from the checkout. It starts a disposable loopback server, creates a fresh synthetic SQLite database, and runs the browser with JavaScript disabled. Playwright is a QA tool and is excluded from the runtime image.
 
+## Private recipe and photo operations
+
+See the [V2.3 and V2.4 operations guide](docs/specs/V2.3-V2.4.md) for the guarded proposal import, local photos, and paired database and media backups. The SQLite-only procedure below also applies to pre-upgrade V1 and V2.2 data.
+
 ## Backup
 
 Use SQLite's online backup API for a consistent snapshot, including when the app is running. For an update, stop the service before taking the snapshot so it also captures the final pre-migration state. Store backups and a protected copy of `.env` outside Git and keep a copy on separate private storage. Record the release tag and verified image ID alongside each backup. Use the configured data directory if it differs from the default below.

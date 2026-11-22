@@ -1,5 +1,5 @@
 from django.urls import path
-from menus.web import catalogue, operations, planning, recipes, shopping, template
+from menus.web import catalogue, operations, photos, planning, recipes, shopping, template
 
 urlpatterns = [
     path("healthz", operations.healthz, name="healthz"),
@@ -24,6 +24,7 @@ urlpatterns = [
     path("plats/new/", catalogue.dish_edit, name="dish_create"),
     path("plats/<int:dish_id>/", catalogue.dish_detail, name="dish_detail"),
     path("plats/<int:dish_id>/edit/", catalogue.dish_edit, name="dish_edit"),
+    path("plats/<int:dish_id>/recepta/foto/", photos.recipe_photo, name="recipe_photo"),
     path("plats/<int:dish_id>/recepta/", recipes.recipe_view, name="recipe_view"),
     path("plats/<int:dish_id>/recepta/edit/", recipes.recipe_editor, name="recipe_edit"),
     path("plats/<int:dish_id>/recepta/draft/", recipes.recipe_editor, {"intent": "draft"}, name="recipe_draft"),
@@ -35,3 +36,7 @@ urlpatterns = [
     path("plantilla/", template.template_view, name="weekly_template"),
     path("plantilla/<int:day>/<str:meal>/", template.template_edit, name="template_edit"),
 ]
+
+handler400 = "menus.web.errors.bad_request"
+handler403 = "menus.web.errors.forbidden"
+handler500 = "menus.web.errors.server_error"

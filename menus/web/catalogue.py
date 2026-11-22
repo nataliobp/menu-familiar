@@ -17,6 +17,7 @@ from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import MadridClock
 from menus.infrastructure.django_template import DjangoTemplateRepository
 from menus.web.common import MEALS, command_done, filter_error, unavailable
+from menus.web.photos import recipe_photo_url
 from menus.web.presentation import catalogue_groups, category_options, recipe_read_context
 
 
@@ -31,7 +32,7 @@ def catalogue(request):
             categories = DjangoTemplateRepository().categories()
             error = filter_error(query, category, categories)
             if archive_filter not in {"0", "1"}:
-                error = "Selecciona plats actius o arxivats."
+                error = "Tria plats actius o arxivats."
             dishes = [] if error else browse_dishes(DjangoCatalogueQueries(), archived, category, query)
         return render(request, "menus/catalogue.html", {
             "dishes": dishes, "archived": archived, "query": query, "category": category,
@@ -52,7 +53,8 @@ def dish_detail(request, dish_id):
             categories = DjangoTemplateRepository().categories()
             secondary = [(key, categories[key]) for key in dish.secondary_categories]
             recipe = get_recipe(queries, dish_id)
-        return render(request, "menus/dish.html", {"dish": dish, "secondary": secondary,
+            photo_url = recipe_photo_url(dish_id)
+        return render(request, "menus/dish.html", {"dish": dish, "secondary": secondary, "photo_url": photo_url,
                       **recipe_read_context(recipe)})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
@@ -133,12 +135,12 @@ def dish_edit(request, dish_id=None):
         if not values["name"].strip() or len(values["name"].strip()) > 200:
             field_errors["name"] = "Escriu un nom de fins a 200 caràcters."
         if values["primary"] not in categories:
-            field_errors["primary"] = "Selecciona una categoria principal."
+            field_errors["primary"] = "Tria una categoria principal."
         secondary = values["secondary"]
         if set(secondary) - categories.keys() or len(set(secondary)) != len(secondary) or values["primary"] in secondary:
-            field_errors["secondary"] = "Selecciona categories secundàries diferents de la principal."
+            field_errors["secondary"] = "Tria categories secundàries diferents de la principal."
         if values["preference"] not in {"both", *MEALS}:
-            field_errors["preference"] = "Selecciona un àpat preferent vàlid."
+            field_errors["preference"] = "Tria un àpat preferent vàlid."
     return render(request, "menus/dish_edit.html", {
         "dish": dish, "categories": category_options(categories), "values": values, "error": error,
         "conflict": status == 409, "field_errors": field_errors, "reviewed": reviewed, "new_creation": new_creation,
@@ -164,7 +166,7 @@ def dish_archive(request, dish_id, action):
             if version != dish.version:
                 raise DishConflict()
         except (ValueError, TypeError):
-            return HttpResponse("Versió invàlida.", status=400)
+            return HttpResponse("La versió no és vàlida.", status=400)
         except DishConflict:
             return render(request, "menus/action_error.html", {}, status=409)
         except DatabaseError:

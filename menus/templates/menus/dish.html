@@ -1,7 +1,7 @@
 {% extends "menus/base.html" %}
 {% block title %}{{ dish.name }} · Menú Familiar{% endblock %}
 {% block content %}
-<a class="button" href="{% url 'catalogue' %}{% if dish.archived %}?archived=1{% endif %}">{% include "menus/components/icon.html" with name="back" only %}Torna als plats</a>
+<a class="button" href="{% url 'catalogue' %}{% if dish.archived %}?archived=1{% endif %}">{% include "menus/components/icon.html" with name="back" only %}Torna al catàleg de plats</a>
 <h1 class="detail-title">{{ dish.name }}</h1>
 <div class="toolbar detail-actions">
   <a class="button" href="{% url 'dish_edit' dish.id %}">{% include "menus/components/icon.html" with name="edit" only %}Edita el plat</a>

@@ -7,3 +7,7 @@ CATEGORIES = (
     ("pasta", "Pasta"), ("eggs", "Ous"), ("fish", "Peix"), ("fried", "Fregits"),
 )
 CATEGORY_KEYS_BY_NAME = {name: key for key, name in CATEGORIES}
+
+
+def canonical_category_name(name):
+    return "Amanides" if name == "Ensalades" else name

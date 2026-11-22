@@ -2,7 +2,7 @@ from django.db import transaction
 from menus.application.template import TemplateConflict
 from menus.application.errors import DataIntegrityError
 from menus.domain.template import WeeklyTemplate
-from menus.domain.categories import CATEGORIES
+from menus.domain.categories import CATEGORIES, canonical_category_name
 from menus.models import CategoryRecord, TemplateSlotRecord, WeeklyTemplateRecord
 
 
@@ -12,6 +12,8 @@ class DjangoTemplateRepository:
 
     def categories(self):
         categories = dict(CategoryRecord.objects.order_by("name_ca").values_list("key", "name_ca"))
+        if "salads" in categories:
+            categories["salads"] = canonical_category_name(categories["salads"])
         if categories != dict(CATEGORIES):
             raise DataIntegrityError("Invalid category vocabulary")
         return categories

@@ -2,7 +2,7 @@ from django.db import IntegrityError, transaction
 from menus.application.dishes import DishConflict, DuplicateReceipt
 from menus.domain.recipe import effective_recipe, recipe_transition
 from menus.infrastructure.django_planning import DjangoPlanningRepository
-from menus.models import CreationReceipt, DishRecord, SecondaryCategoryRecord, WeeklyMenuRecord
+from menus.models import CatalogueSourceRecord, CreationReceipt, DishRecord, SecondaryCategoryRecord, WeeklyMenuRecord
 
 
 class DjangoDishRepository:
@@ -39,6 +39,7 @@ class DjangoDishRepository:
         if not DishRecord.objects.filter(pk=dish_id, version=version).update(name=data.name, primary_category_id=data.primary_category,
                 meal_preference=data.meal_preference, special_occasion=data.special_occasion, version=version + 1):
             raise DishConflict()
+        CatalogueSourceRecord.objects.filter(dish_id=dish_id).update(catalogue_edited=True)
         SecondaryCategoryRecord.objects.filter(dish_id=dish_id).delete()
         SecondaryCategoryRecord.objects.bulk_create([SecondaryCategoryRecord(dish_id=dish_id, category_id=key) for key in data.secondary_categories])
         return True

@@ -137,3 +137,11 @@ class ManualShoppingItemRecord(models.Model):
             models.CheckConstraint(condition=(Q(quantity__isnull=True, unit__isnull=True) | Q(quantity__isnull=False, unit__isnull=False)), name="manual_quantity_pair"),
             models.CheckConstraint(condition=Q(unit__isnull=True) | Q(unit__in=["g", "kg", "ml", "l", "unit"]), name="manual_unit_valid"),
         ]
+
+
+class CatalogueSourceRecord(models.Model):
+    source_id = models.PositiveBigIntegerField(primary_key=True)
+    dish = models.OneToOneField(DishRecord, on_delete=models.CASCADE, related_name="catalogue_source")
+    catalogue_edited = models.BooleanField(default=False)
+    rename_applied = models.BooleanField(default=False)
+    photo_digest = models.CharField(max_length=64, blank=True)

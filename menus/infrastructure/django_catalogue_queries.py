@@ -13,6 +13,8 @@ class DjangoCatalogueQueries:
         status = "published" if recipe and recipe.published is not None else (
             "draft" if recipe and recipe.draft is not None else "missing"
         )
+        if status == "published" and isinstance(recipe.published, dict) and "proposal" in recipe.published:
+            status = "proposed"
         return DishView(record.pk, record.name, CategoryView(record.primary_category_id, record.primary_category.name_ca),
                         tuple(sorted(category.category_id for category in record.secondary_categories.all())),
                         record.meal_preference, record.special_occasion, record.archived, record.version, status)
