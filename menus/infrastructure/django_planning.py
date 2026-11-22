@@ -65,8 +65,6 @@ class DjangoPlanningRepository:
             MenuSlotRecord.objects.filter(weekly_menu_id=menu.week, day_index=day, meal=meal).update(
                 state=slot.state, dish_id=slot.dish["dish_id"] if slot.dish else None, dish_snapshot=slot.dish)
         menu.version += 1
-        from menus.infrastructure.django_shopping import reconcile
-        reconcile(menu)
 
     def dish_snapshot(self, dish_id, include_archived=False):
         query = DishRecord.objects.select_related("primary_category").filter(pk=dish_id)

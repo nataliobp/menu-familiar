@@ -1,5 +1,7 @@
 # Web and UX implementation contract
 
+> V1 reference. For current F07 behavior, storage access and acceptance, see [V2.5](V2.5-SHOPPING-REMINDER.md).
+
 Use the replacement V1 [visual design board](../ux/index.html) and [state matrix](../ux/STATE-MATRIX.md) as the visual reference for layout and journeys. They supersede both historical boards; do not consult or implement their obsolete states. All visible content, including Django validation messages, dates, labels, units and empty/error states, uses standard Catalan. No image slots, decorative food imagery, login UI or other modules.
 
 ## Navigation and responsive rules

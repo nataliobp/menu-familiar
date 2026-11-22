@@ -1,5 +1,7 @@
 # Domain model and invariants
 
+> V1 reference. For current F07 behavior, storage access and acceptance, see [V2.5](V2.5-SHOPPING-REMINDER.md).
+
 Use one bounded context (menus). Implement domain types in plain Python with dates and Decimal values. Prefer small dataclasses, enums and pure functions.
 
 ## Relationships and aggregate boundaries

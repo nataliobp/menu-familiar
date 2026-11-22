@@ -2,13 +2,13 @@
 
 **Status: consolidated V1 implementation baseline.** This corpus specifies seven features and 30 use cases for the existing repository. The [decision record](01-decisions.md) captures the approved product rules and cross-cutting technical defaults. Interface copy is Catalan and technical documentation is English.
 
-The [V2.1–V2.2 supplement](V2.1-V2.2.md) takes precedence over the detailed V1 use-case contracts for the V2.2 changes. The original M0–M8 delivery plan and UX mockups remain V1 references. See the [V2.3–V2.4 operations guide](V2.3-V2.4.md) for the private recipe import and media lifecycle.
+The [V2.1–V2.2 supplement](V2.1-V2.2.md) takes precedence over the detailed V1 use-case contracts for the V2.2 changes. The original M0–M8 delivery plan and UX mockups remain V1 references. See the [V2.3–V2.4 operations guide](V2.3-V2.4.md) for the private recipe import and media lifecycle. [V2.5 supersedes V1 F07](V2.5-SHOPPING-REMINDER.md) with the read-only weekly ingredient reminder.
 
 ## Reading order and authority
 
 1. Root instructions and summaries govern project scope, workflow and architectural boundaries. The detailed V1 contracts below define behavior, implementation and acceptance for that same baseline. Legacy specifications and mockups are superseded.
-2. Documents 02–08 are the shared normative contracts. Consult the relevant case and its shared contract together.
-3. Each feature directory has one document per stable use-case ID from the current 30-case inventory. Each defines dependencies, contract, flow, exceptions, code responsibilities and acceptance tests. M0 and M8 are technical milestones, not user cases.
+2. Documents 02–08 are the shared V1 contracts. Read the relevant case with its shared contract and applicable V2 supplements.
+3. Each feature directory has one document per stable use-case ID from the original 30-case inventory. Each defines dependencies, contract, flow, exceptions, code responsibilities and acceptance tests. M0 and M8 are technical milestones, not user cases.
 4. The [replacement visual design](../ux/index.html), [UX handoff](../ux/README.md) and [state matrix](../ux/STATE-MATRIX.md) govern visual reference. The shared domain, transaction, and HTTP contracts govern behavior.
 5. `REVIEW-AND-EXECUTION.md` contains the Codex prompts and the review/fix/QA gates.
 
@@ -80,7 +80,11 @@ One household, one LAN application, one reusable template, weekly menus, catalog
 - [F06-UC03 — Save a recipe draft](F06-recipe-management/F06-UC03-save-recipe-draft.md)
 - [F06-UC04 — Publish a complete recipe](F06-recipe-management/F06-UC04-publish-recipe.md)
 
-### F07-shopping-list
+### F07 — Weekly ingredient reminder
+
+- [Current F07 contract from V2.5](V2.5-SHOPPING-REMINDER.md)
+
+The following V1 cases are retained as historical reference.
 
 - [F07-UC01 — Generate and view the weekly shopping list](F07-shopping-list/F07-UC01-generate-shopping-list.md)
 - [F07-UC02 — Add, edit and remove manual products](F07-shopping-list/F07-UC02-manage-manual-products.md)

@@ -1,5 +1,7 @@
 # F07-UC04 — Check or uncheck a shopping item
 
+> Historical V1 contract, superseded by the [V2.5 ingredient reminder](../V2.5-SHOPPING-REMINDER.md).
+
 - **Status:** V1 baseline
 - **Milestone:** M7
 - **Dependencies:** F07-UC01–03

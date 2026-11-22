@@ -1,5 +1,7 @@
 # F07-UC01 — Generate and view the weekly shopping list
 
+> Historical V1 contract, superseded by the [V2.5 ingredient reminder](../V2.5-SHOPPING-REMINDER.md).
+
 - **Status:** V1 baseline
 - **Milestone:** M7
 - **Dependencies:** F01–F04 implemented; F06-UC01–04; M4 atomic writes

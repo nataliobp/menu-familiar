@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
+from threading import Barrier, Event
 
 from django.db import DatabaseError, close_old_connections, connection
 from django.test import TransactionTestCase
@@ -126,92 +126,46 @@ class PlanningConcurrencyTests(TransactionTestCase):
         self.assertEqual(MenuSlotRecord.objects.filter(weekly_menu_id=future).count(), 14)
         self.assertEqual(MenuSlotRecord.objects.filter(weekly_menu_id=future, state="selected").count(), 1)
 
-    def test_competing_first_overlay_creation(self):
+    def test_reminder_reads_a_coherent_snapshot_during_recipe_publication(self):
+        from decimal import Decimal
         from menus.application.planning import change_menu
         from menus.application.recipes import save_recipe
-        from menus.application.shopping import mutate_shopping
+        from menus.application.shopping import get_ingredient_reminder
         from menus.domain.recipe import recipe_content
         from menus.infrastructure.django_dishes import DjangoDishRepository
-        from menus.infrastructure.django_shopping import DjangoShoppingRepository, ShoppingConflict
-        self.require_file()
-        content = recipe_content("Cou", [{"name": "Arròs", "quantity": "100", "unit": "g"}], True)
-        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, content, True)
-        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
-        barrier = Barrier(2, timeout=10)
-        class SynchronizedShopping(DjangoShoppingRepository):
-            def read(self, week):
-                value = super().read(week)
-                barrier.wait()
-                return value
-        def write(quantity):
-            close_old_connections()
-            try:
-                mutate_shopping(SynchronizedShopping(), self.clock, self.week, 2, 0, "adjust", {"key": "arròs", "family": "g", "quantity": quantity})
-                return "saved"
-            except (ShoppingConflict, DatabaseError):
-                return "rejected"
-            finally:
-                close_old_connections()
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(write, ["200", "300"]))
-        self.assertCountEqual(results, ["saved", "rejected"])
-        view = DjangoShoppingRepository().read(self.week)
-        self.assertEqual(view[1].version, 1)
-        self.assertIn(view[2][0]["overlay"].adjusted_quantity, {"200.000", "300.000"})
 
-    def test_recipe_publication_racing_shopping_adjustment(self):
-        from menus.application.dishes import DishConflict
-        from menus.application.planning import PlanningConflict, change_menu
-        from menus.application.recipes import save_recipe
-        from menus.application.shopping import mutate_shopping
-        from menus.domain.recipe import recipe_content
-        from menus.infrastructure.django_dishes import DjangoDishRepository
-        from menus.infrastructure.django_shopping import DjangoShoppingRepository, ShoppingConflict
         self.require_file()
-        first = recipe_content("Cou", [{"name": "Arròs", "quantity": "100", "unit": "g"}], True)
-        second = recipe_content("Cou", [{"name": "Arròs", "quantity": "200", "unit": "g"}], True)
-        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, first, True)
-        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
-        barrier = Barrier(2, timeout=10)
-        class SynchronizedDish(DjangoDishRepository):
-            def save_recipe(self, *args):
-                result = super().save_recipe(*args)
-                barrier.wait()
-                return result
-        class SynchronizedShopping(DjangoShoppingRepository):
-            def read(self, week):
-                result = super().read(week)
-                barrier.wait()
-                return result
-        def recipe_write():
+        before = recipe_content("Cou", [{"name": "Arròs", "quantity": "100", "unit": "g"}], True)
+        after = recipe_content("Cou", [{"name": "Arròs", "quantity": "200", "unit": "g"}], True)
+        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, before, True)
+        version = change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk).version
+        change_menu(self.repo, self.clock, self.week, (1, "lunch"), version, "assign", self.dish.pk)
+        updated = Event()
+        finish = Event()
+
+        class PausedPublisher(DjangoDishRepository):
+            def refresh_dish(self, dish_id, current_week):
+                super().refresh_dish(dish_id, current_week)
+                updated.set()
+                if not finish.wait(timeout=10):
+                    raise RuntimeError("Timed out waiting for the read")
+
+        def write():
             close_old_connections()
             try:
-                save_recipe(SynchronizedDish(), self.clock, self.dish.pk, 2, second, True)
-                return "saved"
-            except (DishConflict, PlanningConflict, DatabaseError):
-                return "rejected"
+                save_recipe(PausedPublisher(), self.clock, self.dish.pk, 2, after, True)
             finally:
                 close_old_connections()
-        def shopping_write():
-            close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            writer = pool.submit(write)
             try:
-                mutate_shopping(SynchronizedShopping(), self.clock, self.week, 2, 0, "adjust", {"key": "arròs", "family": "g", "quantity": "150"})
-                return "saved"
-            except (ShoppingConflict, DatabaseError):
-                return "rejected"
+                self.assertTrue(updated.wait(timeout=10))
+                self.assertEqual(get_ingredient_reminder(self.repo, self.week).rows[0]["quantity"], Decimal("200"))
             finally:
-                close_old_connections()
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(recipe_write), pool.submit(shopping_write)]
-            outcomes = [future.result(timeout=15) for future in futures]
-        self.assertCountEqual(outcomes, ["saved", "rejected"])
-        menu, state, rows, *_ = DjangoShoppingRepository().read(self.week)
-        if outcomes[0] == "saved":
-            self.assertEqual(str(rows[0]["quantity"]), "200.000")
-            self.assertIsNone(state)
-        else:
-            self.assertEqual(str(rows[0]["quantity"]), "100.000")
-            self.assertEqual(rows[0]["overlay"].adjusted_quantity, "150.000")
+                finish.set()
+            writer.result(timeout=10)
+        self.assertEqual(get_ingredient_reminder(self.repo, self.week).rows[0]["quantity"], Decimal("400"))
 
     def test_duplicate_dish_creation_retries_same_receipt(self):
         from uuid import uuid4

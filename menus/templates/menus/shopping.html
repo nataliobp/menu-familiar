@@ -1,15 +1,68 @@
-{% extends "menus/base.html" %}{% load menus_format %}{% block content %}
-<h1>Llista de la compra</h1>{% include "menus/components/week_nav.html" %}
-<p><a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">Ves al menú setmanal</a></p>
-{% if not menu %}<p>No hi ha cap menú per a aquesta setmana.</p>{% else %}
-{% if not editable %}<p>Setmana passada · només de consulta</p>{% endif %}<p>Àpats pendents: {{ pending }}</p>
-{% for position, name, status in incomplete %}<p>{% if status == "draft" %}Quantitats provisionals de l’esborrany{% else %}Recepta pendent{% endif %}: {{ name }} ({{ position.0|weekday_ca }}, {% if position.1 == 'lunch' %}dinar{% else %}sopar{% endif %})</p>{% endfor %}
-<h2>Ingredients</h2>
-{% for row in rows %}<section class="shopping-row"><strong>{{ row.name }}</strong> · {% if row.quantity == None %}Al gust{% else %}{{ row.quantity|decimal_ca }} {{ row.key.1|unit_ca:row.quantity }}{% endif %}{% for note in row.notes %}<small> · {{ note }}</small>{% endfor %}{% if row.overlay.adjusted_quantity %} · Ajustat: {{ row.overlay.adjusted_quantity|decimal_ca }}{% endif %}{% if row.overlay.checked %} · Comprat{% endif %}
-{% if editable %}<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' 'checked' %}">{% csrf_token %}<input type="hidden" name="menu_version" value="{{ menu.version }}"><input type="hidden" name="overlay_version" value="{{ state.version|default:0 }}"><input type="hidden" name="key" value="{{ row.key.0 }}"><input type="hidden" name="family" value="{{ row.key.1 }}"><input type="hidden" name="checked" value="{% if row.overlay.checked %}0{% else %}1{% endif %}"><button aria-label="{% if row.overlay.checked %}Desmarca{% else %}Marca com a comprat{% endif %}: {{ row.name }}">{% if row.overlay.checked %}Desmarca{% else %}Marca com a comprat{% endif %}</button></form>
-{% if row.quantity != None %}<a href="{% url 'adjust_form' week|date:'Y-m-d' %}?key={{ row.key.0|urlencode }}&amp;family={{ row.key.1|urlencode }}">Ajusta la quantitat</a>{% endif %}{% endif %}</section>{% empty %}<p>No s’han calculat ingredients.</p>{% endfor %}
-<h2>Productes afegits</h2>{% for item in manual %}<section class="shopping-row"><strong>{{ item.name }}</strong>{% if item.quantity %} · {{ item.quantity|decimal_ca }} {{ item.unit|unit_ca:item.quantity }}{% endif %}{% if item.checked %} · Comprat{% endif %}
-{% if editable %}<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' 'checked' %}">{% csrf_token %}<input type="hidden" name="menu_version" value="{{ menu.version }}"><input type="hidden" name="overlay_version" value="{{ state.version|default:0 }}"><input type="hidden" name="id" value="{{ item.id }}"><input type="hidden" name="checked" value="{% if item.checked %}0{% else %}1{% endif %}"><button aria-label="{% if item.checked %}Desmarca{% else %}Marca com a comprat{% endif %}: {{ item.name }}">{% if item.checked %}Desmarca{% else %}Marca com a comprat{% endif %}</button></form><a href="{% url 'manual_edit' week|date:'Y-m-d' item.id %}">Edita</a> · <a data-confirm href="{% url 'manual_remove' week|date:'Y-m-d' item.id %}?menu_version={{ menu.version }}&amp;overlay_version={{ state.version }}">Elimina</a>{% endif %}</section>{% empty %}<p>Cap producte afegit.</p>{% endfor %}
-{% if editable %}<p><a href="{% url 'manual_add' week|date:'Y-m-d' %}">Afegeix un producte</a></p>{% endif %}
-{% if orphans %}<h2>Ajustos pendents de revisar</h2>{% for orphan in orphans %}<p>{{ orphan.last_name }} · {{ orphan.adjusted_quantity|decimal_ca }} {{ orphan.family|unit_ca:orphan.adjusted_quantity }}</p>{% if editable %}<form method="post" action="{% url 'shopping_action' week|date:'Y-m-d' 'reset' %}">{% csrf_token %}<input type="hidden" name="menu_version" value="{{ menu.version }}"><input type="hidden" name="overlay_version" value="{{ state.version|default:0 }}"><input type="hidden" name="key" value="{{ orphan.ingredient_key }}"><input type="hidden" name="family" value="{{ orphan.family }}"><button>Restableix</button></form>{% endif %}{% endfor %}{% endif %}
-{% endif %}{% endblock %}
+{% extends "menus/base.html" %}
+{% load menus_format %}
+{% block title %}Llista de la compra{% endblock %}
+{% block content %}
+<header class="reminder-heading">
+  <div>
+    <h1>Llista de la compra</h1>
+    <p class="hint">Ingredients necessaris per al menú setmanal</p>
+  </div>
+  {% include "menus/components/week_nav.html" %}
+</header>
+<div class="reminder-tools">
+  <p><a class="button" href="{% url 'menu_week' week|date:'Y-m-d' %}">{% include "menus/components/icon.html" with name="calendar" only %}Ves al menú setmanal</a></p>
+  {% if reminder.pending or reminder.skipped %}
+    <p class="hint">{% if reminder.pending == 1 %}Queda 1 àpat per planificar.{% elif reminder.pending %}Queden {{ reminder.pending }} àpats per planificar.{% endif %}
+      {% if reminder.skipped == 1 %}S’ha omès 1 àpat.{% elif reminder.skipped %}S’han omès {{ reminder.skipped }} àpats.{% endif %}</p>
+  {% endif %}
+</div>
+{% if past_week %}<p class="notice">Setmana passada · només de consulta</p>{% endif %}
+{% if historical_unavailable %}
+  <p class="notice">No es poden recuperar les dades històriques dels ingredients d’aquesta setmana.</p>
+{% elif not reminder %}
+  <p class="hint">No hi ha cap menú per a aquesta setmana.</p>
+  <p class="empty">Encara no hi ha plats seleccionats per a aquesta setmana.</p>
+{% else %}
+  {% if reminder.incomplete %}
+    <section class="panel reminder-warnings" aria-labelledby="reminder-warnings">
+      <h2 id="reminder-warnings">Receptes incompletes</h2>
+      <p>Hi ha plats sense recepta completa; la llista pot ser incompleta.</p>
+      <ul>
+        {% for position, name, status in reminder.incomplete %}
+          <li><strong>{{ name }}</strong> · {{ position.0|weekday_ca }}, {% if position.1 == 'lunch' %}dinar{% else %}sopar{% endif %} ·
+            <span>{% if status == 'draft' %}Quantitats provisionals de l’esborrany{% elif past_week %}Recepta històrica no disponible{% else %}Recepta pendent{% endif %}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% if sections %}
+    <div class="reminder-body">
+      {% for label, icon, rows in sections %}
+        <section class="panel" aria-labelledby="reminder-section-{{ forloop.counter }}">
+          <h2 id="reminder-section-{{ forloop.counter }}">
+            {% if icon %}{% include "menus/components/category.html" with key=icon label=label only %}{% else %}{{ label }}{% endif %}
+          </h2>
+          <ul class="ingredient-list" role="list">
+            {% for row in rows %}
+              <li class="ingredient">
+                <div>{{ row.name }}{% for note in row.notes %}<small>{{ note }}</small>{% endfor %}</div>
+                <div class="reminder-amount">
+                  <strong>{% if row.quantity is not None %}{{ row.quantity|recipe_quantity_ca }} {{ row.key.1|unit_ca:row.quantity }}{% elif row.key.1 == 'taste' %}Al gust{% else %}Quantitat pendent{% if row.key.1 != 'unknown' %} · {{ row.key.1|unit_ca }}{% endif %}{% endif %}</strong>
+                  {% if row.subtotal %}<small>Subtotal conegut</small>{% endif %}
+                  {% if row.unknown and row.quantity is not None %}<small>Quantitat pendent</small>{% endif %}
+                  {% if row.provisional %}<small>Provisional</small>{% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endfor %}
+    </div>
+  {% elif reminder.selected %}
+    <p class="empty">Encara no hi ha ingredients per mostrar.</p>
+  {% else %}
+    <p class="empty">Encara no hi ha plats seleccionats per a aquesta setmana.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

@@ -35,7 +35,8 @@ class HistoryUpgradeTests(TransactionTestCase):
                     for day in range(7) for meal in ("lunch", "dinner")])
 
     def tearDown(self):
-        MigrationExecutor(connection).migrate(self.after)
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
         super().tearDown()
 
     def test_pre_shopping_week_has_identical_projection_after_upgrade(self):
@@ -69,15 +70,19 @@ class OverlayUpgradeTests(TransactionTestCase):
         Manual.objects.create(shopping=state, name="Pa", quantity="2.000", unit="unit", checked=True)
 
     def tearDown(self):
-        MigrationExecutor(connection).migrate(self.after)
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
         super().tearDown()
 
     def test_frozen_shopping_state_survives_overlay_schema_upgrade(self):
-        from menus.infrastructure.django_shopping import DjangoShoppingRepository
-        before = DjangoShoppingRepository().read(self.week)
+        from menus.models import GeneratedOverlayRecord, ManualShoppingItemRecord, ShoppingStateRecord
+
+        def stored_state():
+            return (ShoppingStateRecord.objects.values_list("week_id", "version").get(),
+                    GeneratedOverlayRecord.objects.values_list("ingredient_key", "adjusted_quantity", "checked").get(),
+                    ManualShoppingItemRecord.objects.values_list("name", "quantity", "checked").get())
+
+        before = stored_state()
         MigrationExecutor(connection).migrate(self.after)
-        after = DjangoShoppingRepository().read(self.week)
-        self.assertEqual(before, after)
-        self.assertEqual(after[1].manual_items[0].quantity, "2.000")
-        self.assertTrue(after[1].manual_items[0].checked)
-        self.assertEqual(after[-1][0].adjusted_quantity, "150.000")
+        self.assertEqual(stored_state(), before)
+        self.assertEqual(before, ((self.week, 3), ("arròs", "150.000", False), ("Pa", "2.000", True)))

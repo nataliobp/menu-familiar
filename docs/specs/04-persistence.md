@@ -1,5 +1,7 @@
 # Persistence, transactions and import
 
+> V1 reference. For current F07 behavior, storage access and acceptance, see [V2.5](V2.5-SHOPPING-REMINDER.md).
+
 SQLite is the database for V1. Django ORM types map to domain objects; `menus/models.py` is discovery only. Schema evolves via migrations by milestone; do not create all future tables in M0. No schema reset, `flush`, destructive migration or test against real family DB. Keep migrations in Git. All field names in English; technical enum values stable, translated at web edge. Prefer ordinary normalized references where they express invariants; snapshot JSON is intentionally denormalized for history, never blindly store ORM serialization.
 
 ## Target schema

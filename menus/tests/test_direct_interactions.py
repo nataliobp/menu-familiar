@@ -50,7 +50,13 @@ class DirectInteractionTests(TestCase):
         self.assertContains(self.client.get(picker, {"category": "", "q": "POLLÁSTRE"}), "Pollastre al curri")
         self.assertFalse(WeeklyMenuRecord.objects.exists())
         self.assertEqual(self.client.post(assignment, {"version": 0, "dish": 999}).status_code, 400)
-        with patch("menus.infrastructure.django_shopping.reconcile", side_effect=DatabaseError):
+        original_save = DjangoPlanningRepository.save
+
+        def fail_after_save(repo, menu, version):
+            original_save(repo, menu, version)
+            raise DatabaseError("synthetic failure after persisting the menu")
+
+        with patch.object(DjangoPlanningRepository, "save", fail_after_save):
             self.assertEqual(self.client.post(assignment, {"version": 0, "dish": self.chicken.pk}).status_code, 503)
         self.assertFalse(WeeklyMenuRecord.objects.exists())
         self.assertFalse(MenuSlotRecord.objects.exists())

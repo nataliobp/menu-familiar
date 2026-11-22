@@ -14,7 +14,7 @@ from menus.domain.recipe import recipe_content
 from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import DjangoPlanningRepository
 from menus.models import (
-    CreationReceipt, DishRecord, GeneratedOverlayRecord, ManualShoppingItemRecord, MenuSlotRecord,
+    CreationReceipt, DishRecord, GeneratedOverlayRecord, MenuSlotRecord,
     RecipeRecord, WeeklyMenuRecord,
 )
 from menus.tests.test_planning import Clock
@@ -175,20 +175,6 @@ class ReviewRegressions(TestCase):
                     save_recipe(repository, self.clock, self.dish.pk, 2, content)
                 self.assertEqual(self.state(), before)
 
-    def test_manual_replay_after_deletion_and_invalid_reset(self):
-        add = self.url("shopping_action", "manual_add")
-        data = {"menu_version": 2, "overlay_version": 0, "name": "Pa", "token": str(uuid4())}
-        self.assertContains(self.client.post(add, data, follow=True), "Producte afegit a la llista.")
-        item_id = CreationReceipt.objects.get().result_id
-        self.assertEqual(self.client.post(self.url("shopping_action", "checked"),
-                         {"menu_version": 2, "overlay_version": 1, "id": item_id, "checked": "1"}).status_code, 302)
-        self.assertEqual(self.client.post(self.url("shopping_action", "manual_remove"),
-                         {"menu_version": 2, "overlay_version": 2, "id": item_id, "confirm": "yes"}).status_code, 302)
-        self.assertContains(self.client.post(add, data, follow=True), "però ja no és a la llista")
-        self.assertEqual(CreationReceipt.objects.count(), 1)
-        self.assertEqual(self.client.post(self.url("shopping_action", "reset"),
-                         {"menu_version": 2, "overlay_version": 3, "key": "invalid", "family": "invalid"}).status_code, 400)
-
     def test_move_to_same_position_and_largest_dish_identifier(self):
         response = self.client.post(self.url("move_action", "move"), {
             "version": 2, "source_day": 0, "source_meal": "lunch",
@@ -223,20 +209,6 @@ class ReviewRegressions(TestCase):
         self.assertContains(review, 'name="version" value="2"')
         self.assertContains(review, "Categoria actual: Ous")
         self.assertEqual(self.client.post(template, {**data, "version": 2}).status_code, 302)
-
-    def test_shopping_conflict_review_has_current_overlay_and_keeps_requested_check(self):
-        publication = recipe_content("Coeu-ho", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
-        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, publication, True)
-        data = {"menu_version": 3, "overlay_version": 0, "key": "arròs", "family": "g"}
-        self.assertEqual(self.client.post(self.url("adjust_form"), {**data, "quantity": "180"}).status_code, 302)
-        url = self.url("shopping_action", "checked")
-        self.assertContains(self.client.post(url, {**data, "checked": "1"}), "Ajustat: 180", status_code=409)
-        review = self.client.post(url, {**data, "checked": "1", "action": "review"})
-        self.assertContains(review, 'name="overlay_version" value="1"')
-        self.assertContains(review, 'name="checked" value="1"')
-        self.assertFalse(GeneratedOverlayRecord.objects.get().checked)
-        self.assertEqual(self.client.post(url, {**data, "checked": "1", "overlay_version": 1}).status_code, 302)
-        self.assertTrue(GeneratedOverlayRecord.objects.get().checked)
 
     def test_first_assignment_reports_success_and_identifies_active_destination(self):
         future = (self.week + timedelta(days=7)).isoformat()
@@ -295,48 +267,6 @@ class ReviewRegressions(TestCase):
         self.assertContains(response, 'href="#ingredients-error"', status_code=400)
         self.assertContains(response, 'id="ingredients-error"', status_code=400)
         self.assertEqual(self.state(), before)
-
-    def test_changed_manual_receipt_requires_explicit_new_creation(self):
-        url = self.url("shopping_action", "manual_add")
-        token = str(uuid4())
-        data = {"menu_version": 2, "overlay_version": 0, "name": "Pa", "token": token}
-        self.assertEqual(self.client.post(url, data).status_code, 302)
-        changed = {**data, "name": "Pa integral"}
-        self.assertContains(self.client.post(url, changed), "Pa integral", status_code=409)
-        reviewed = self.client.post(url, {**changed, "action": "review"})
-        self.assertContains(reviewed, "Afegeix com a producte nou")
-        self.assertContains(reviewed, 'value="Pa integral"')
-        self.assertEqual(ManualShoppingItemRecord.objects.count(), 1)
-        self.assertEqual(CreationReceipt.objects.count(), 1)
-        new_token = reviewed.context["data"]["token"]
-        self.assertNotEqual(new_token, token)
-        submitted = {**changed, "overlay_version": 1, "token": new_token}
-        self.assertContains(self.client.post(url, submitted, follow=True), "Producte afegit")
-        self.assertContains(self.client.post(url, submitted, follow=True), "ja s’havia afegit")
-        self.assertEqual(ManualShoppingItemRecord.objects.count(), 2)
-        self.assertEqual(CreationReceipt.objects.count(), 2)
-
-    def test_checked_rejects_ambiguous_references_before_changing_any_item(self):
-        draft = recipe_content("Cuina", [{"name": "Sal", "taste": True}])
-        save_recipe(DjangoDishRepository(), self.clock, self.dish.pk, 1, draft)
-        add = self.url("shopping_action", "manual_add")
-        self.assertEqual(self.client.post(add, {
-            "menu_version": 3, "overlay_version": 0, "name": "Pa", "token": str(uuid4()),
-        }).status_code, 302)
-        item = ManualShoppingItemRecord.objects.get()
-        url = self.url("shopping_action", "checked")
-        data = {"menu_version": 3, "overlay_version": 1, "checked": "1"}
-        for fields in (
-            {"id": item.id, "key": "sal", "family": "taste"},
-            {"key": "sal"},
-            {"id": [item.id, item.id]},
-        ):
-            self.assertEqual(self.client.post(url, {**data, **fields}).status_code, 400)
-        item.refresh_from_db()
-        self.assertFalse(item.checked)
-        self.assertFalse(GeneratedOverlayRecord.objects.exists())
-        self.assertEqual(self.client.post(url, {**data, "key": "sal", "family": "taste"}).status_code, 302)
-        self.assertTrue(GeneratedOverlayRecord.objects.get().checked)
 
     def test_dish_read_failure_retains_fields_and_retry_is_read_only(self):
         editor = reverse("dish_edit", args=[self.dish.pk])

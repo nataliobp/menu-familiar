@@ -168,7 +168,7 @@ class ImportTests(TestCase):
             self.assertEqual(slot.dish["recipe_content"], self.content)
             shopping = self.client.get(f"/compra/{week}/")
             self.assertContains(shopping, "Arròs")
-            self.assertContains(shopping, "75,000 g")
+            self.assertContains(shopping, "75 g")
         target.refresh_from_db()
         unrelated.refresh_from_db()
         self.assertEqual(unrelated.name, "Plat de propietari")

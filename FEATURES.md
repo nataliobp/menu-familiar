@@ -46,13 +46,11 @@ The V1 inventory defines seven features and 30 stable use-case IDs. The [detaile
 - **F06-UC03:** Save a recipe draft.
 - **F06-UC04:** Publish a recipe.
 
-## F07 — Shopping List
+## F07 — Weekly Ingredient Reminder
 
-- **F07-UC01:** Generate and view a weekly shopping list.
-- **F07-UC02:** Add, edit, and remove manual products.
-- **F07-UC03:** Adjust and reset a generated quantity, including reviewing orphaned adjustments.
-- **F07-UC04:** Check or uncheck a shopping-list item.
+- **F07-UC01:** View the dated week's ingredient reminder, with totals for selected dishes and notices for incomplete or provisional data.
+- **F07-UC02–04:** Retired in V2.5. Historical persistence is retained. See the [current F07 contract](docs/specs/V2.5-SHOPPING-REMINDER.md).
 
 ## Business rules and technical tasks
 
-Rules apply across use cases rather than forming separate user goals. In particular, `SPEC.md` governs week editability and historical preservation, live template suggestions, slot states, selection ordering, atomic moves and undo, recipe changes, and shopping-list refresh and preservation. The initial CSV import is a technical prerequisite, not a catalogue use case. Implementation and verification tasks are planned in the relevant milestone.
+Rules apply across use cases rather than forming separate user goals. In particular, `SPEC.md` governs week editability and historical preservation, live template suggestions, slot states, selection ordering, atomic moves and undo, recipe changes, and ingredient projection and historical preservation. The initial CSV import is a technical prerequisite, not a catalogue use case. Implementation and verification tasks are planned in the relevant milestone.

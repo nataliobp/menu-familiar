@@ -115,18 +115,6 @@ class PlanningTests(TestCase):
         record.refresh_from_db()
         self.assertEqual(record.dish_snapshot["schema_version"], 999)
 
-    def test_shopping_invalid_input_is_preserved(self):
-        from unittest.mock import patch
-        from uuid import uuid4
-        from django.urls import reverse
-        create_legacy_menu(self.repo, self.week)
-        url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
-        with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
-            response = self.client.post(url, {"menu_version": 1, "overlay_version": 0, "token": str(uuid4()), "name": "Producte sintètic", "quantity": "abc", "unit": "g"})
-        self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "Producte sintètic", status_code=400)
-        self.assertContains(response, "abc", status_code=400)
-
     def test_recipe_publication_through_web_and_shopping_projection(self):
         from unittest.mock import patch
         from django.urls import reverse
@@ -137,7 +125,7 @@ class PlanningTests(TestCase):
             self.assertEqual(response.status_code, 302)
             response = self.client.get(reverse("shopping_week", args=[self.week.isoformat()]))
             self.assertContains(response, "Arròs")
-            self.assertContains(response, "160,000")
+            self.assertContains(response, "160 g")
             recipe = self.client.get(reverse("recipe_view", args=[self.dish.pk]))
             self.assertContains(recipe, "160 g")
             dish = self.client.get(reverse("dish_detail", args=[self.dish.pk]))
@@ -156,20 +144,6 @@ class PlanningTests(TestCase):
         self.assertContains(response, "Ingredient")
         from menus.models import RecipeRecord
         self.assertFalse(RecipeRecord.objects.exists())
-
-    def test_shopping_retry_preserves_creation_token(self):
-        from unittest.mock import patch
-        from uuid import uuid4
-        from django.db import OperationalError
-        from django.urls import reverse
-        token = str(uuid4())
-        url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
-        data = {"menu_version": 1, "overlay_version": 0, "token": token, "name": "Producte de prova", "quantity": "", "unit": ""}
-        with patch("menus.web.shopping.mutate_shopping", side_effect=OperationalError("synthetic lock")):
-            response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 503)
-        self.assertContains(response, token, status_code=503)
-        self.assertContains(response, "Producte de prova", status_code=503)
 
     def test_recipe_conflict_shows_submitted_and_current_values(self):
         from unittest.mock import patch

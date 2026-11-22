@@ -1,6 +1,6 @@
 # Menú Familiar
 
-Django application for household meal planning. The authoritative contracts are [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs](docs/specs/README.md) and [docs/ux](docs/ux/README.md). Record consolidated owner QA and verify household network isolation before releasing the service.
+Django application for household meal planning. The authoritative contracts are [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs](docs/specs/README.md) and [docs/ux](docs/ux/README.md). The [V2.5 contract](docs/specs/V2.5-SHOPPING-REMINDER.md) describes the read-only `Llista de la compra` tab. Record consolidated owner QA and verify household network isolation before releasing the service.
 
 ## Disposable development setup
 
@@ -206,7 +206,7 @@ Use a disposable database and synthetic dishes first. Do not run destructive or 
 - Planning: open and browse a missing future week, then create it by choosing or skipping a meal. Check immediate filtering, replacement, removal and reactivation, live suggestions in empty editable slots, and read-only past weeks.
 - Advanced planning: move and exchange, cancel or confirm a skipped target, undo, and verify stale tabs and later edits cannot overwrite newer data.
 - Catalogue and recipes: create, edit, archive and restore a synthetic dish; save an incomplete draft, validate bad amounts, publish and edit a later draft; compare editable weeks with frozen history.
-- Shopping: check aggregation, compatible conversions, repeated dishes, distinct units, `al gust`, incomplete coverage, manual products, adjustments, checks, orphan recovery and reset after menu and recipe changes.
+- Ingredient reminder: check grouping, exact totals, repeated dishes, distinct units, `Al gust`, incomplete coverage, week switching and refresh after menu or recipe changes. See the [V2.5 owner QA handoff](docs/V2.5-OWNER-QA.md).
 - Readiness: inspect 360–430px mobile and 800×480 / 1024×600 tablet flows, keyboard and focus; verify restart and isolated backup/restore; confirm trusted LAN access and denial from untrusted networks over IPv4 and IPv6.
 
 Record the owner’s results and the actual network isolation checks before making the service available for household use.

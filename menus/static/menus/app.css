@@ -254,7 +254,7 @@ body:has(.sheet[open]) main { overflow: hidden; }
 .recipe-photo figcaption { margin: 4px 0 0; }
 .recipe-note { margin: 12px 0 0; }
 .recipe-body { display: grid; gap: 12px; margin-bottom: 16px; }
-.panel, .shopping-row, .edit-form {
+.panel, .edit-form {
   min-width: 0;
   padding: 14px;
   border: 1px solid var(--line);
@@ -296,8 +296,12 @@ fieldset { min-width: 0; margin: 12px 0; padding: 10px; border: 1px solid var(--
 legend { font-weight: 650; }
 #secondary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 8px; }
 .form-actions { margin-top: 12px; }
-.shopping-row { margin: 8px 0; }
-.shopping-row form { display: inline-block; margin: 4px; }
+.reminder-body { display: grid; gap: 12px; }
+.reminder-warnings { background: #faf1df; border-color: #dcc9a6; margin-bottom: 12px; }
+.reminder-warnings ul { margin: 0; padding-inline-start: 20px; }
+.reminder-warnings li + li { margin-top: 6px; }
+.reminder-body h2 { display: flex; align-items: center; gap: 8px; }
+.reminder-amount { text-align: end; }
 
 @media (max-width: 380px) {
   .archive-link span { display: none; }
@@ -334,6 +338,12 @@ legend { font-weight: 650; }
   .recipe-body:has(.recipe-photo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, .8fr); }
   .recipe-photo { grid-column: 3; grid-row: 1; margin: 0; }
   .recipe-body { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .reminder-heading, .reminder-tools { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .reminder-heading { justify-content: space-between; }
+  .reminder-heading h1 { margin-bottom: 4px; }
+  .reminder-heading .week-nav { width: min(50%, 460px); margin: 0; }
+  .reminder-heading p, .reminder-tools p { margin: 0; }
+  .reminder-body { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .catalogue-groups { columns: 2; column-gap: 16px; }
   .catalogue-groups > section { width: 100%; display: inline-block; break-inside: avoid; }
 }

@@ -1,5 +1,7 @@
 # Application design and contracts
 
+> V1 reference. For current F07 behavior, storage access and acceptance, see [V2.5](V2.5-SHOPPING-REMINDER.md).
+
 ## Package layout (target; add only needed files per slice)
 
 ```text

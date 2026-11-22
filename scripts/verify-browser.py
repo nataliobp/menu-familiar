@@ -77,17 +77,11 @@ def verify(page, other, origin, week, dish_id, long_id, long_name):
     slots.first.focus()
     page.keyboard.press("Enter")
     page.wait_for_url(slot)
-    page.get_by_role("link", name="Llista de la compra").click()
+    page.get_by_role("link", name="Llista de la compra", exact=True).click()
     assert page.url.endswith(f"/compra/{week}/")
-    page.get_by_role("link", name="Afegeix un producte").click()
-    page.locator('[name="name"]').fill("Pa de prova")
-    page.get_by_role("button", name="Desa").click()
-    page.get_by_role("button", name="Marca com a comprat: Pa de prova").click()
-    assert page.get_by_role("button", name="Desmarca: Pa de prova").count() == 1
-    page.get_by_role("link", name="Elimina", exact=True).click()
-    expect(page.get_by_role("heading", name="Eliminar el producte?")).to_be_visible()
-    page.get_by_role("link", name="Cancel·la").click()
-    expect(page.get_by_text("Pa de prova", exact=True)).to_be_visible()
+    expect(page.get_by_role("heading", name="Llista de la compra")).to_be_visible()
+    expect(page.get_by_role("heading", name="Receptes incompletes")).to_be_visible()
+    expect(page.locator("main form")).to_have_count(0)
     page.get_by_role("link", name="Menú setmanal", exact=True).click()
     assert page.url == menu
 
@@ -271,10 +265,11 @@ def verify_v2(page, other, origin, week, today, dish_id, long_id, long_name):
     expect(page.locator(".week .slot").first).to_have_class("slot skipped")
     page.locator(".week .slot").first.click()
     meal_actions.get_by_role("button", name="Torna a planificar").click()
+    expect(page.locator(".week .slot").first).to_have_class("slot pending")
     page.locator(".week .slot").first.click()
-    picker_url = page.url
     candidates = page.locator(".list-row")
-    assert candidates.count() == 57
+    expect(candidates).to_have_count(57)
+    picker_url = page.url
     assert "Ocasió especial" in candidates.last.inner_text()
     capture("picker")
     page.get_by_label("Cerca un plat", exact=True).fill("arros")
@@ -468,6 +463,86 @@ def verify_virtual(page, other, origin, current_week):
     assert all(url.startswith(origin + "/") for url in requests), requests
 
 
+def reminder_fixture(repo, clock, week):
+    from menus.application.planning import change_menu
+    from menus.application.recipes import save_recipe
+    from menus.domain.recipe import recipe_content
+    from menus.infrastructure.django_dishes import DjangoDishRepository
+    from menus.models import DishRecord
+
+    def dish(name):
+        return DishRecord.objects.create(name=name, primary_category_id="cereals", meal_preference="both", special_occasion=False)
+
+    published = dish("Arròs amb verdures de prova")
+    published_content = recipe_content("Cou l’arròs.", [
+        {"name": "Arròs", "quantity": "0,080", "unit": "kg"},
+        {"name": "Ceba", "quantity": "1", "unit": "unit"},
+        {"name": "Pollastre", "quantity": "250", "unit": "g"},
+        {"name": "Lluç", "quantity": "100", "unit": "g"},
+        {"name": "Ous", "quantity": "1", "unit": "unit"},
+        {"name": "Ingredient de prova amb un nom llarg per comprovar que la secció i el text s’ajusten bé", "taste": True},
+        {"name": "Pebre negre", "taste": True},
+        {"name": "Brou vegetal", "quantity": "125,125", "unit": "ml"},
+    ], True)
+    save_recipe(DjangoDishRepository(), clock, published.pk, 1, published_content, True)
+    draft = dish("Sopa de prova en esborrany")
+    draft_content = recipe_content("", [
+        {"name": "Brou vegetal", "quantity": "250", "unit": "ml"}, {"name": "Ceba", "unit": "unit"},
+    ])
+    save_recipe(DjangoDishRepository(), clock, draft.pk, 1, draft_content)
+    missing = dish("Plat de prova sense recepta")
+    version = 0
+    for day, dish_id in enumerate((published.pk, draft.pk, missing.pk, published.pk)):
+        version = change_menu(repo, clock, week, (day, "lunch"), version, "assign", dish_id).version
+
+
+def verify_reminder(page, origin, week, mode):
+    url = f"{origin}/compra/{week}/"
+    for width, height in ((360, 800), (390, 844), (800, 480), (1024, 600)):
+        page.set_viewport_size({"width": width, "height": height})
+        page.goto(url)
+        expect(page.get_by_role("heading", name="Llista de la compra", exact=True)).to_be_visible()
+        expect(page.get_by_text("Ingredients necessaris per al menú setmanal", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name="Receptes incompletes")).to_be_visible()
+        expect(page.get_by_text("Quantitats provisionals de l’esborrany")).to_be_visible()
+        expect(page.get_by_text("Recepta pendent", exact=True)).to_be_visible()
+        expect(page.get_by_text("500,25 ml", exact=True)).to_be_visible()
+        expect(page.get_by_text("160 g", exact=True)).to_be_visible()
+        expect(page.get_by_role("region", name="Fruita i verdura").get_by_text("2 unitats", exact=True)).to_be_visible()
+        expect(page.get_by_text("Subtotal conegut", exact=True)).to_be_visible()
+        expect(page.get_by_text("Quantitat pendent", exact=True)).to_be_visible()
+        assert [label.strip() for label in page.locator(".reminder-body h2").all_text_contents()] == [
+            "Fruita i verdura", "Carn", "Peix", "Lactis i ous", "Rebost", "Altres",
+        ]
+        expect(page.get_by_role("region", name="Rebost").get_by_text("Al gust", exact=True)).to_be_visible()
+        expect(page.locator("main form, main button, main input")).to_have_count(0)
+        for locator in (page.locator("body"), page.locator("main")):
+            assert locator.evaluate("el => el.scrollWidth <= el.clientWidth"), (mode, width)
+        if width >= 800:
+            first_amount = page.locator(".reminder-amount strong").first.bounding_box()
+            navigation = page.locator(".module-nav").bounding_box()
+            assert first_amount["y"] + first_amount["height"] <= navigation["y"], (mode, width)
+        if screenshots := os.environ.get("MENU_BROWSER_SCREENSHOTS"):
+            page.screenshot(path=Path(screenshots) / f"{mode}-reminder-{width}x{height}.png")
+        page.get_by_role("link", name="Ves al menú setmanal").click()
+        assert page.url == f"{origin}/menu/{week}/"
+        page.get_by_role("link", name="Llista de la compra", exact=True).click()
+        assert page.url == url
+    page.get_by_role("link", name="Setmana següent").click()
+    expect(page.get_by_text("No hi ha cap menú per a aquesta setmana.")).to_be_visible()
+    page.get_by_role("link", name="Setmana anterior").click()
+    assert page.url == url
+    assert page.request.post(url + "manual/add/").status == 404
+    page.goto(f"{origin}/menu/{week}/slots/3/lunch/")
+    actions = page.get_by_role("link", name="Accions de l’àpat")
+    if mode == "js":
+        actions.click()
+    page.get_by_role("link", name="Retira el plat").click()
+    page.get_by_role("button", name="Sí, retira el plat").click()
+    page.get_by_role("link", name="Llista de la compra", exact=True).click()
+    expect(page.get_by_text("80 g", exact=True)).to_be_visible()
+    expect(page.get_by_text("375,125 ml", exact=True)).to_be_visible()
+
 def main():
     with TemporaryDirectory(prefix="menu-browser-") as directory:
         os.environ.update(DJANGO_ENV="development", DJANGO_DEBUG="1",
@@ -535,6 +610,18 @@ def main():
                 verify_v2(page, other, f"http://127.0.0.1:{server.port}", week, clock.today().isoformat(),
                           dish.pk, long_dish.pk, long_name)
                 verify_virtual(page, other, f"http://127.0.0.1:{server.port}", week)
+                browser.close()
+
+            reminder_week = week + timedelta(weeks=8)
+            no_js_week = reminder_week + timedelta(weeks=2)
+            reminder_fixture(repository, clock, reminder_week)
+            reminder_fixture(repository, clock, no_js_week)
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch()
+                for javascript, target in ((True, reminder_week), (False, no_js_week)):
+                    page = browser.new_page(java_script_enabled=javascript)
+                    page.set_default_timeout(5000)
+                    verify_reminder(page, f"http://127.0.0.1:{server.port}", target, "js" if javascript else "no-js")
                 browser.close()
         finally:
             server.terminate()

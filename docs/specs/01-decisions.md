@@ -1,5 +1,7 @@
 # Decisions for independent review
 
+> V1 reference. For current F07 behavior, storage access and acceptance, see [V2.5](V2.5-SHOPPING-REMINDER.md).
+
 This record consolidates the approved V1 product rules and the technical defaults resolving the independent review. The linked shared contracts define the acceptance details.
 
 | ID | Decision / rationale | Status |

@@ -26,7 +26,7 @@ Use the latest planned meal date across all persisted weeks, including future da
 
 ## Weekly planning
 
-- Weeks start Monday in Europe/Madrid local time. Past weeks are read-only, including shopping, undo, and all displayed snapshot values. Current and future weeks are editable. A missing editable week renders all 14 pending slots. The first valid change creates the week and saves the change in one transaction. Past weeks cannot be backfilled.
+- Weeks start Monday in Europe/Madrid local time. Past weeks are read-only, including the ingredient snapshot and undo state. Current and future weeks are editable. A missing editable week renders all 14 pending slots. The first valid change creates the week and saves the change in one transaction. Past weeks cannot be backfilled.
 
 - Present a week as seven days with a lunch and a dinner slot for each day: 14 slots in total. Each slot holds at most one dish and may remain empty.
 - Provide a reusable weekly template with suggested categories for each of its 14 slots. Users can edit these suggestions and see them on the next render of every editable week, including weeks with existing menus. A template slot may have no suggested category. A suggested category guides selection but does not restrict it: users can choose a dish from any category. Show the current suggestion with its colour pictogram and `Tria un plat` before opening a pending slot. The picker starts with the current category and allows switching to all categories. Historical views never read the current template.
@@ -36,15 +36,14 @@ Use the latest planned meal date across all persisted weeks, including future da
 - Move to a pending slot or, after confirmation, to a skipped slot. Exchange two selected dishes. Positions retain their suggestions, and a move leaves its source pending.
 - Moves, exchanges and undo are atomic. Undo restores both previous slot states once. A subsequent successful planning edit or snapshot change affecting either involved position invalidates undo. An unrelated snapshot refresh or a no-op preserves it.
 - Persist the plan so it remains available after leaving and returning. Planning changes must not silently discard unrelated slots.
-- Keep each weekly menu independent. Editing a different week, the reusable template, dishes, or recipes must not retroactively change a historical week's slots, displayed dish or recipe details, or shopping list. Preserve the values needed for that week; edits to a current or future week change only that week, except for the specified effects of recipe changes. Recency ordering may still consult planned dates across weeks.
+- Keep each weekly menu independent. Editing a different week, the reusable template, dishes, or recipes must not retroactively change a historical week's slots, displayed dish or recipe details, or frozen ingredient quantities. Preserve the values needed for that week; edits to a current or future week change only that week, except for the specified effects of recipe changes. Recency ordering may still consult planned dates across weeks.
 
-## Shopping list
+## Weekly ingredient reminder
 
-- Generate a shopping list from the dishes currently in the selected week, using recipe ingredient quantities for two adults. Count each planned occurrence; combine matching ingredients when their units are compatible, and keep incompatible units separate without guessing conversions.
-- Refresh affected current and future shopping lists when their plans or the recipes of their planned dishes change. Pending and skipped slots contribute nothing. Past weeks retain their historical recipe details and shopping lists unchanged.
-- Because the supplied CSV contains no recipes or quantities, identify dishes with missing ingredient information and make clear that the list is incomplete. Never present invented quantities as facts. Recipe data must be supplied before a complete list can be generated.
-- Allow manual products to be added, edited, and removed for a week, including their quantities and units. Allow users to adjust generated quantities for that week's shopping list without changing the underlying recipes. Clearly distinguish manual products and adjusted quantities from generated values; allow an adjustment to be reset to the generated value.
-- Persist each checkbox and manual edit for its week. Matching generated items retain checks and adjustments when their calculated quantity changes. Show the updated calculated quantity. Keep disappeared adjustments visible for review.
+- `Llista de la compra` is a read-only ingredient reminder for the selected week. It counts each selected occurrence for two adults and derives quantities from the saved effective recipe. Pending and skipped slots and template suggestions contribute no ingredients.
+- Combine compatible quantities exactly by canonical ingredient identity, preserve incompatible rows, retain pantry ingredients, and mark unknown amounts and provisional or partial coverage.
+- Recompute on each read. Preserve frozen past recipes and surface unavailable historical data. Legacy manual products, overrides, checks and receipts stay stored outside the reminder.
+- See the [V2.5 reminder contract](docs/specs/V2.5-SHOPPING-REMINDER.md) for current F07 behavior and HTTP rules.
 
 ## Responsive design
 
@@ -61,6 +60,6 @@ Use the latest planned meal date across all persisted weeks, including future da
 
 - Test catalogue import, browsing, search, archiving and restoration, recipe viewing, drafts and publication, week navigation, unfiltered selection, template slots without suggestions, dish assignment, replacement and removal, multiple-category membership, the complete ordering precedence and ties, preference flexibility, and all 14 slots and editing operations.
 - Test shopping-list aggregation, repeated dishes, incompatible units, missing recipe data, and updates after plan changes.
-- Test template reuse and independence, slot state transitions, atomic moves and exchanges and their undo, strict past-week read-only behavior, current and future editing, historical isolation, and dish and recipe editing. Test recipe changes across affected current, future, and past weeks. Test manual products, quantity adjustments, checkboxes, and preservation across list refreshes.
+- Test template reuse and independence, slot state transitions, atomic moves and exchanges and their undo, strict past-week read-only behavior, current and future editing, historical isolation, and dish and recipe editing. Test recipe changes across affected current, future, and past weeks. Verify that legacy data remain intact and obsolete mutation routes cannot write.
 - Verify the responsive flows on mobile and landscape viewports of 800×480 and 1024×600.
 - Protect family data. Do not alter existing Home Server services. Work incrementally, avoid unnecessary dependencies and functionality, and do not introduce images.

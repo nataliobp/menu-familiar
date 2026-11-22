@@ -1,5 +1,7 @@
 # Verification and QA contract
 
+> V1 reference. For current F07 behavior, storage access and acceptance, see [V2.5](V2.5-SHOPPING-REMINDER.md).
+
 Tests are part of the implementation, not a later feature. Use `unittest` / Django test runner (already installed via requirements) and stdlib synthetic fixtures. Domain/application tests import no framework; runnable with `python -m unittest discover -s menus/tests/domain` and application equivalent or a documented precise command. Integration/web suite `python manage.py test` runs in separate test DB; confirm actual test runner discovers all suites, including test packages. No tests refer to private catalogue names or copy its rows. Browser QA can use local Chromium/Playwright if already present and permitted, or add a documented dev-only browser dependency only when justified; no new production framework. Real viewport manual checks remain pending until owner performs them. Never claim browser E2E from Django Client alone.
 
 ## Test levels
