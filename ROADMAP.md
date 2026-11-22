@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap groups the full V1 baseline. The [implementation plan](docs/specs/07-implementation-plan.md) defines slice order, automated gates, and cross-feature regression timing.
+This roadmap records the full V1 baseline. The [V2.2 product corrections](docs/specs/V2.1-V2.2.md) supersede its interaction contracts. The [implementation plan](docs/specs/07-implementation-plan.md) defines slice order, automated gates, and cross-feature regression timing.
 
 Continue through vertical slices after automated gates pass. Consolidate manual owner QA before release. Catalan UI, responsive behavior, privacy, and architectural boundaries apply throughout.
 

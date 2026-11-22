@@ -2,16 +2,18 @@ from django.contrib import messages
 from django.db import DatabaseError, transaction
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from menus.application.template import TemplateConflict, get_template, set_template_category
 from menus.infrastructure.django_template import DjangoTemplateRepository
-from menus.web.common import DAYS, MEALS, unavailable
+from menus.web.common import DAYS, MEALS, parse_week, unavailable
 from menus.web.presentation import category_label, category_options
 
 
 @require_http_methods(["GET"])
 def template_view(request):
+    week = parse_week(request.GET["week"]) if "week" in request.GET else None
     try:
         template, categories = get_template(DjangoTemplateRepository())
         days = []
@@ -22,7 +24,7 @@ def template_view(request):
                 meals.append((meal, meal_label, key, category_label(key, categories.get(key))))
             days.append((day, label, meals))
         return render(request, "menus/template.html", {
-            "days": days, "version": template.version, "categories": category_options(categories),
+            "days": days, "version": template.version, "categories": category_options(categories), "week": week,
         })
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
@@ -32,6 +34,8 @@ def template_view(request):
 def template_edit(request, day, meal):
     if day not in range(7) or meal not in MEALS:
         raise Http404()
+    week = parse_week(request.GET["week"]) if "week" in request.GET else None
+    template_url = reverse("weekly_template", query={"week": week.isoformat()} if week else None)
     enhanced = request.method == "POST" and request.headers.get("Accept") == "application/json"
     repo = DjangoTemplateRepository()
     try:
@@ -55,14 +59,14 @@ def template_edit(request, day, meal):
                     return render(request, "menus/template_edit.html", {
                         "day": DAYS[day], "meal": MEALS[meal], "categories": category_options(categories),
                         "selected": selected, "version": template.version,
-                        "current_label": current_label,
+                        "current_label": current_label, "week": week, "template_url": template_url,
                     })
                 saved = set_template_category(repo, (day, meal), selected or None, version)
                 if enhanced:
                     return JsonResponse({"version": saved.version, "category": selected,
                                          "label": category_label(selected, categories.get(selected))})
                 messages.success(request, "Plantilla actualitzada")
-                return redirect("weekly_template")
+                return redirect(template_url)
             except (ValueError, TypeError):
                 error, status = "Selecciona una categoria vàlida.", 400
             except TemplateConflict:
@@ -74,7 +78,7 @@ def template_edit(request, day, meal):
         return render(request, "menus/template_edit.html", {
             "day": DAYS[day], "meal": MEALS[meal], "categories": category_options(categories),
             "selected": selected, "selected_label": category_label(selected, categories.get(selected)),
-            "current_label": current_label,
+            "current_label": current_label, "week": week, "template_url": template_url,
             "version": version_value, "error": error, "conflict": status == 409,
         }, status=status)
     except (DatabaseError, ValueError, KeyError):

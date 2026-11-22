@@ -1,6 +1,8 @@
 from datetime import date
 
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.template.loader import render_to_string
 
 from menus.domain.planning import MAX_WEEK_START
@@ -29,3 +31,8 @@ def filter_error(query, category, categories):
     if category and category not in categories:
         return "Selecciona una categoria vàlida."
     return None
+
+def command_done(request, route, **kwargs):
+    if request.headers.get("Accept") == "application/json":
+        return JsonResponse({"location": reverse(route, kwargs=kwargs)})
+    return redirect(route, **kwargs)

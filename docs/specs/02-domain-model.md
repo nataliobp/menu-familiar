@@ -7,7 +7,7 @@ Use one bounded context (menus). Implement domain types in plain Python with dat
 ```mermaid
 flowchart LR
   T[WeeklyTemplate] -->|14| TS[TemplateSlot]
-  T -. copy suggestions .-> W[WeeklyMenu]
+  T -. editable read projection .-> W[WeeklyMenu]
   W -->|14| S[MenuSlot]
   S -->|0..1| DS[DishSnapshot]
   D[Dish] -->|1 primary, 0..n secondary| C[Category]
@@ -43,7 +43,7 @@ Weekly menu, template, dish with recipe, and separate shopping overlays are cons
 | `WeeklyTemplate` (`template.py`) | `id=1`, `slots: mapping[SlotPosition, str | None]`, `version`; exactly all 14 positions; `set_suggestion(position, category_key)`, `clear_suggestion(position)`. |
 | `SlotState` (`planning.py`) | `PENDING`, `SELECTED`, `SKIPPED`. |
 | `DishSnapshot` (`planning.py`) | `dish_id`, `name`, `primary_category` and `secondary_categories` as key+name values, `meal_preference`, `special_occasion`, `recipe_status`, `recipe_content: RecipeContent | None`; copy values, no mutable alias to catalogue. No archival status dependency for historical display. |
-| `MenuSlot` (`planning.py`) | `position`, `suggested_category` nullable snapshot (key+display name), `state`, `dish_snapshot: DishSnapshot | None`; selected iff snapshot exists. |
+| `MenuSlot` (`planning.py`) | `position`, nullable legacy suggestion snapshot (key+display name), unused in editable reads, `state`, `dish_snapshot: DishSnapshot | None`; selected iff snapshot exists. |
 | `WeeklyMenu` (`planning.py`) | Monday identity, 14 slots, version, shopping projection version and optional undo. Domain rules receive the captured current Monday. |
 | `UndoRecord` (`planning.py`) | Two positions and exact before and after values. Undo requires intact after values and eligible menu version. Rebase eligibility atomically on unrelated snapshot refresh. |
 | `GeneratedKey` (`shopping.py`) | `ingredient_key: str`, `family: Literal['g','ml','unit','taste']`; stable independent of display and quantity. |

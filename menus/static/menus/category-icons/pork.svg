@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Porc</title>
+<path d="M16 24 11 9c9-1 14 3 17 10M48 24l5-15c-9-1-14 3-17 10" fill="#ef9fbb" stroke="#a96781" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M17 22 15 14l9 6M47 22l2-8-9 6" fill="#f9c4d5"/>
+  <circle cx="32" cy="35" r="22" fill="#f5b8c9" stroke="#a96781" stroke-width="2.5"/>
+  <circle cx="24" cy="32" r="2.4" fill="#4e4547"/><circle cx="40" cy="32" r="2.4" fill="#4e4547"/>
+  <rect x="18" y="38" width="28" height="17" rx="9" fill="#e58fae" stroke="#bb6a8e" stroke-width="2"/>
+  <ellipse cx="26" cy="46" rx="2.6" ry="3.5" fill="#9e567a"/><ellipse cx="38" cy="46" rx="2.6" ry="3.5" fill="#9e567a"/>
+</svg>

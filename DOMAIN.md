@@ -5,7 +5,7 @@ This is the domain reference for the [consolidated V1 baseline](docs/specs/READM
 ## Ubiquitous language and relationships
 
 - **Weekly menu:** A plan for seven days, with a lunch and dinner **slot** for each day. A slot may contain one planned dish.
-- **Weekly template:** Reusable category suggestions for the 14 slots. A new week receives copies; a suggestion may be absent and never restricts selection.
+- **Weekly template:** Reusable category suggestions for the 14 slots. Pending slots in current and future weeks display today’s suggestion at read time. A suggestion may be absent and never restricts selection. Legacy copied values remain stored for compatibility.
 - **Dish:** A catalogue entry with identity, categories, meal preference, and an occasion flag. A dish can be planned multiple times and can belong to multiple categories.
 - **Recipe:** A dish-owned lifecycle with a working draft and effective publication for two adults. Before publication, known draft quantities contribute provisionally. Drafts can contain named ingredients with unknown quantities.
 - **Shopping list:** A week's generated ingredients and user-maintained products, adjustments, and checks. An **orphaned adjustment** is an adjustment whose generated item has disappeared.

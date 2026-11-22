@@ -1,0 +1,15 @@
+<form class="toolbar form-actions" method="post" action="{% url 'move_action' week|date:'Y-m-d' action %}"{% if not target %} data-direct-command{% endif %}>
+  {% csrf_token %}
+  <input type="hidden" name="version" value="{{ menu.version }}">
+  <input type="hidden" name="source_day" value="{{ day }}">
+  <input type="hidden" name="source_meal" value="{{ meal }}">
+  <input type="hidden" name="destination_day" value="{{ target_day }}">
+  <input type="hidden" name="destination_meal" value="{{ target_meal }}">
+  {% if target %}
+    {% if target.state == 'skipped' %}<input type="hidden" name="confirm" value="yes">{% endif %}
+    <a class="button" data-confirm-cancel href="{% url 'move_choice' week|date:'Y-m-d' day meal %}">Cancel·la</a>
+    <button class="primary">{% if action == 'exchange' %}Intercanvia els plats{% else %}Mou el plat{% endif %}</button>
+  {% else %}
+    <button class="list-row">{{ label }} · {{ meal_label }} · {% if slot.dish %}{{ slot.dish.name }}{% else %}Pendent{% endif %}</button>
+  {% endif %}
+</form>

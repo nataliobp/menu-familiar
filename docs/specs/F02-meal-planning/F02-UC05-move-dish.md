@@ -17,7 +17,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 ## Main scenario and postconditions
 
 1. Open selected detail, `Mou o intercanvia`, choose destination; skipped target shows confirm with server-checked flag.
-2. Domain copies selected snapshot to destination, source pending/null; suggestion labels stay at positions. Capture exact before/after pair and eligible version for undo.
+2. Domain copies selected snapshot to destination, source pending/null. A newly pending source shows the current suggestion for its position. Capture exact before/after pair and eligible version for undo.
 3. One transaction saves both slots/undo and M7 reconciliation; return new week and undo availability.
 
 ## Alternative and failure flows

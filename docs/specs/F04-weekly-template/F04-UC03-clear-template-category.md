@@ -16,8 +16,8 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 
 ## Main scenario and postconditions
 
-1. Select `Lliure`, save; clear category on target slot only.
-2. Persist; show free label. Future week copies null suggestion and picker defaults to all.
+1. Select `Lliure` to save immediately and clear category on target slot only.
+2. Persist; show free label. The missing hint vanishes in every editable week and the picker defaults to all.
 3. Existing menu remains untouched; slot in template has no pending/selected/skipped state.
 
 ## Alternative and failure flows
@@ -27,7 +27,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 ## Acceptance criteria and automated scenarios
 
 - Clear previously set slot; null stored, `Lliure` displayed; all 14 positions remain.
-- At M2, a new week from a free slot starts pending with no filter; existing copied labels unaffected.
+- Clearing an existing hint makes the pending slot show only `Tria un plat`. Historical rows are preserved.
 
 ## Implementation tasks and boundaries
 

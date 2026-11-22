@@ -39,6 +39,6 @@ Add tests at the layer owning the rule, real SQLite integration tests for persis
 
 ## Manual QA
 
-Search partial name, clear, search nonexistent, then choose `Mostra tots els plats` and select another.
+Search partial name, clear, search nonexistent, then choose `Totes les categories` and select another.
 
 Record owner QA status as pending until performed; automated execution must not claim manual approval.

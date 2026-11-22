@@ -1,13 +1,15 @@
 {% extends "menus/base.html" %}
 {% block content %}
-<h1>Confirma l’acció</h1>
-<p>{% if action == 'remove' %}Vols retirar aquest plat?{% else %}Vols ometre aquest àpat?{% endif %}</p>
-<p>{{ dish.name }} · {{ day_label }}, {{ meal_label }} · Setmana del {{ week|date:"d/m/Y" }}</p>
-<form class="toolbar form-actions" method="post">
-  {% csrf_token %}
-  <input type="hidden" name="version" value="{{ menu.version }}">
-  <input type="hidden" name="confirm" value="yes">
-  <button class="danger">Confirma</button>
-</form>
-<a class="button" href="{% url 'slot_detail' week|date:'Y-m-d' day meal %}">Cancel·la</a>
+<section data-confirmation>
+  <h1 data-confirm-heading>{% if action == 'remove' %}Retirar el plat?{% else %}Ometre l’àpat?{% endif %}</h1>
+  <p data-confirm-description>{{ dish.name }} · {{ day_label }}, {{ meal_label }}</p>
+  <p>{% if action == 'remove' %}L’àpat quedarà pendent de planificar.{% else %}El plat es retirarà del menú i no comptarà a la llista de la compra.{% endif %}</p>
+  <form class="toolbar form-actions" method="post" action="{{ request.path }}">
+    {% csrf_token %}
+    <input type="hidden" name="version" value="{{ menu.version }}">
+    <input type="hidden" name="confirm" value="yes">
+    <a class="button" data-confirm-cancel href="{% url 'slot_detail' week|date:'Y-m-d' day meal %}">Cancel·la</a>
+    <button class="danger">{% if action == 'remove' %}Sí, retira el plat{% else %}Sí, omet l’àpat{% endif %}</button>
+  </form>
+</section>
 {% endblock %}

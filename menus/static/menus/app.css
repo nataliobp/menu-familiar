@@ -114,7 +114,8 @@ button:disabled { cursor: wait; opacity: .65; }
 }
 .week-nav strong { text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
 .week-nav .icon-button, .week-nav .button { border-color: transparent; }
-.week-actions { justify-content: flex-end; margin-bottom: 8px; }
+.week-heading { gap: 6px 12px; }
+.week-feedback .notice { margin: 0; padding: 6px 9px; }
 .week { display: grid; gap: 8px; }
 .day { min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: #edf1e8; }
 .day.today { border-color: #78a288; background: #e2eddf; }
@@ -139,11 +140,16 @@ button:disabled { cursor: wait; opacity: .65; }
 }
 a.slot:hover { border-color: var(--primary); background: #f8fbf6; }
 .slot.pending { border-style: dashed; border-color: var(--control-line); color: var(--primary); }
-.slot.skipped, .slot.preview { background: #f6f7f2; color: var(--muted); }
+.slot.skipped { background: #f6f7f2; color: var(--muted); }
 .slot.skipped strong { font-weight: 550; }
 .slot strong { font-size: 14px; line-height: 1.25; }
 .slot-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--muted); font-size: 12px; line-height: 1.2; }
-.category-icon { display: inline-flex; color: var(--primary); }
+.category-icon { display: block; flex: none; width: 24px; height: 24px; object-fit: contain; }
+.slot-meta .category-icon { width: 20px; height: 20px; }
+.slot-suggestion { display: flex; align-items: center; gap: 4px; color: #535e57; font-size: 13px; line-height: 1.2; }
+.slot-suggestion .category-icon { width: 22px; height: 22px; }
+.slot-choose { color: var(--primary); font-size: 13px; font-weight: 600; line-height: 1.2; }
+.slot-suggestion .category-label { overflow-wrap: anywhere; }
 .slot-meta .icon { width: 19px; height: 19px; }
 .category-display { display: flex; align-items: center; gap: 6px; }
 
@@ -164,6 +170,8 @@ a.slot:hover { border-color: var(--primary); background: #f8fbf6; }
   box-shadow: 0 -12px 48px #14291e29;
 }
 .sheet::backdrop { background: #14291e70; }
+body:has(#confirmation[open]) #sheet::backdrop { background: transparent; }
+#confirmation { padding-top: 16px; }
 body:has(.sheet[open]) main { overflow: hidden; }
 [data-sheet-only], .has-dialog [data-sheet-fallback] { display: none; }
 .has-dialog [data-sheet-only] { display: inline-flex; }
@@ -180,7 +188,7 @@ body:has(.sheet[open]) main { overflow: hidden; }
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-.category-choice .icon { width: 26px; height: 26px; }
+.category-choice .category-icon { width: 34px; height: 34px; }
 .category-choice[aria-pressed="true"] { background: var(--soft); border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
 [data-template-reload] { margin-top: 10px; }
 .action-list { display: grid; gap: 8px; }
@@ -201,10 +209,16 @@ body:has(.sheet[open]) main { overflow: hidden; }
 .icon-field:focus-within { outline: 3px solid #aa6428; outline-offset: 2px; }
 
 .filter-options { display: grid; grid-template-columns: minmax(0, 230px) auto 1fr; }
+.filter-icon { display: flex; flex: none; }
+.filter-icon .category-label { display: none; }
+.live-filters [data-filter-submit] { display: none; }
+.live-filters .filter-options { grid-template-columns: minmax(0, 230px) auto; }
 .result-count { text-align: right; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .picker-context { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .group-heading { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; }
 .group-heading::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.move-destinations .form-actions { margin: 0; }
+.move-destinations .list-row { width: 100%; }
 .tier-heading { margin: 16px 0 8px; }
 .result-list, .ingredient-list { list-style: none; margin: 0 0 8px; padding: 0; }
 .result-list { border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
@@ -305,6 +319,10 @@ legend { font-weight: 650; }
   .slot-meta .category-label, .slot-meta .meta-divider { display: none; }
   .slot-meta { font-size: 11px; }
   .slot-meta .icon { width: 17px; height: 17px; }
+  .slot-meta .category-icon { width: 18px; height: 18px; }
+  .slot-suggestion { font-size: 12px; }
+  .slot-suggestion .category-icon { width: 19px; height: 19px; }
+  .slot-choose { font-size: 12px; }
   .sheet { inset: 0; margin: auto; max-height: 94dvh; border-radius: 19px; }
   .sheet-handle { display: none; }
   .category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -312,4 +330,9 @@ legend { font-weight: 650; }
   .recipe-body { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .catalogue-groups { columns: 2; column-gap: 16px; }
   .catalogue-groups > section { width: 100%; display: inline-block; break-inside: avoid; }
+}
+
+@media (max-width: 380px) {
+  .week-nav strong { font-size: 13px; }
+  .week-nav .button { padding-inline: 6px; }
 }

@@ -9,11 +9,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from menus.application.catalogue_queries import picker_dishes
-from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, create_menu, get_menu, move_or_undo
+from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, get_menu, move_or_undo, read_plan
 from menus.domain.planning import monday
 from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 from menus.infrastructure.django_planning import DjangoPlanningRepository, MadridClock
-from menus.web.common import DAYS, MEALS, filter_error, parse_week, unavailable
+from menus.web.common import DAYS, MEALS, command_done, filter_error, parse_week, unavailable
 from menus.web.presentation import category_options, picker_groups, week_navigation
 
 
@@ -28,42 +28,21 @@ def menu_view(request, week):
     repo, clock = DjangoPlanningRepository(), MadridClock()
     try:
         with transaction.atomic():
-            menu = get_menu(repo, week)
             today = clock.today()
             editable = week >= monday(today)
-            if menu:
-                slots = menu.slots
-            elif editable:
-                template, categories = repo.template()
-                slots = {position: (key, categories.get(key))
-                         for position, key in template.slots.items()}
-            else:
-                slots = None
+            menu, version, suggestions, _ = read_plan(repo, week, editable)
         days = []
-        for day, label in enumerate(DAYS) if slots is not None else ():
+        for day, label in enumerate(DAYS) if menu else ():
             meals = []
-            for meal in ("lunch", "dinner"):
-                slot = slots[(day, meal)]
-                suggestion = (slot.suggestion if menu else slot) or ("", "")
-                meals.append((meal, MEALS[meal], slot, *suggestion))
+            for meal, meal_label in MEALS.items():
+                slot = menu.slots[day, meal]
+                key, category = suggestions.get((day, meal), ("", ""))
+                meals.append((meal, meal_label, slot, key, category))
             day_date = week + timedelta(days=day)
             days.append((day, label, day_date, day_date == today, meals))
         return render(request, "menus/menu.html", {"week": week, "days": days, "menu": menu,
-                      "editable": editable, **week_navigation(week, "current_menu", "menu_week")})
+                      "version": version, "editable": editable, **week_navigation(week, "current_menu", "menu_week")})
     except (DatabaseError, ValueError, KeyError):
-        return unavailable()
-
-
-@require_POST
-def menu_create(request, week):
-    week = parse_week(week)
-    try:
-        create_menu(DjangoPlanningRepository(), MadridClock(), week)
-        messages.success(request, "Menú setmanal creat")
-        return redirect("menu_week", week=week.isoformat())
-    except PastWeek:
-        return HttpResponse("Aquesta setmana és només de consulta.", status=403)
-    except (DatabaseError, Rollover, ValueError, KeyError):
         return unavailable()
 
 
@@ -75,28 +54,28 @@ def menu_picker(request, week, day, meal):
     repo = DjangoPlanningRepository()
     try:
         with transaction.atomic():
-            menu = get_menu(repo, week)
-            if not menu or week < monday(MadridClock().today()):
+            if week < monday(MadridClock().today()):
                 raise Http404()
+            menu, version, suggestions, categories = read_plan(repo, week, True)
+            suggestion = suggestions.get((day, meal))
             slot = menu.slots[(day, meal)]
             action = request.GET.get("action", "assign")
             if action not in ("assign", "replace") or slot.state != ("pending" if action == "assign" else "selected"):
                 raise Http404()
-            categories = repo.template()[1]
             category = request.GET.get("category")
             mode = request.GET.get("mode")
             if mode == "all":
                 category = ""
-            if category is None and slot.suggestion:
-                category = slot.suggestion[0]
+            if category is None and suggestion:
+                category = suggestion[0]
             query = request.GET.get("q", "")
             error = filter_error(query, category, categories)
             dishes = [] if error else picker_dishes(DjangoCatalogueQueries(), meal, category, query)
         return render(request, "menus/picker.html", {
-            "week": week, "day": day, "meal": meal, "action": action, "menu": menu,
-            "dishes": dishes, "tiers": picker_groups(dishes, meal, category),
+            "week": week, "day": day, "meal": meal, "action": action, "version": version,
+            "suggestion": suggestion, "dishes": dishes, "tiers": picker_groups(dishes, meal, category),
             "categories": category_options(categories), "category": category, "query": query,
-            "slot": slot, "day_label": DAYS[day], "meal_label": MEALS[meal], "error": error,
+            "day_label": DAYS[day], "meal_label": MEALS[meal], "error": error,
         }, status=400 if error else 200)
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
@@ -117,12 +96,14 @@ def menu_action(request, week, day, meal, action):
                         slot_url=reverse("slot_detail", args=[week.isoformat(), day, meal]))
     try:
         version = int(request.POST.get("version", ""))
+        if action == "remove" and request.POST.get("confirm") != "yes":
+            raise ValueError("Confirmation required")
         dish_id = int(request.POST.get("dish", "0"))
         if action in ("assign", "replace") and not 1 <= dish_id <= 9223372036854775807:
             raise ValueError("Invalid dish identifier")
         change_menu(DjangoPlanningRepository(), MadridClock(), week, (day, meal), version, action, dish_id, request.POST.get("confirm") == "yes")
         messages.success(request, "Canvi desat")
-        return redirect("menu_week", week=week.isoformat())
+        return command_done(request, "menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
     except PlanningConflict:
@@ -130,7 +111,7 @@ def menu_action(request, week, day, meal, action):
             recovery.pop("picker_url")
             try:
                 current = get_menu(DjangoPlanningRepository(), week)
-                state = current.slots[day, meal].state if current else None
+                state = current.slots[day, meal].state if current else "pending"
                 next_action = {"pending": "assign", "selected": "replace"}.get(state)
                 if next_action:
                     picker_filters["action"] = next_action
@@ -159,37 +140,32 @@ def slot_detail(request, week, day, meal):
             if menu is None:
                 raise Http404()
             slot = menu.slots[(day, meal)]
-        return render(request, "menus/slot.html", {"week": week, "day": day, "meal": meal, "slot": slot, "day_label": DAYS[day], "meal_label": MEALS[meal], "menu": menu, "editable": week >= monday(MadridClock().today())})
+        return render(request, "menus/slot.html", {"week": week, "day": day, "meal": meal, "slot": slot, "day_label": DAYS[day], "meal_label": MEALS[meal], "menu": menu, "editable": week >= monday(MadridClock().today()), "version": menu.version})
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
 
 
 @require_http_methods(["GET", "POST"])
 def menu_confirm(request, week, day, meal, action):
-    if request.method == "POST" and request.POST.get("confirm") == "yes":
-        return menu_action(request, week, day, meal, action)
     week = parse_week(week)
     if day not in range(7) or meal not in MEALS or action not in ("remove", "skip"):
         raise Http404()
+    if request.method == "POST" and request.POST.get("confirm") == "yes":
+        return menu_action(request, week.isoformat(), day, meal, action)
     try:
+        if week < monday(MadridClock().today()):
+            return HttpResponse("Aquesta setmana és només de consulta.", status=403)
+        if request.method == "POST" and action == "skip" and request.POST.get("version") == "0":
+            return menu_action(request, week.isoformat(), day, meal, action)
         menu = get_menu(DjangoPlanningRepository(), week)
         if not menu:
             raise Http404()
-        if week < monday(MadridClock().today()):
-            return HttpResponse("Aquesta setmana és només de consulta.", status=403)
-        if request.method == "POST":
-            try:
-                if int(request.POST.get("version", "")) != menu.version:
-                    return render(request, "menus/action_error.html", {"week": week}, status=409)
-            except ValueError:
-                return HttpResponse("Versió invàlida.", status=400)
-            if action == "skip" and menu.slots[(day, meal)].state in ("pending", "skipped"):
-                return menu_action(request, week.isoformat(), day, meal, action)
         slot = menu.slots[(day, meal)]
-        if request.method == "GET":
-            observed = request.GET.get("version")
-            if observed is not None and observed != str(menu.version):
-                return render(request, "menus/action_error.html", {"week": week}, status=409)
+        observed = request.POST.get("version", "") if request.method == "POST" else request.GET.get("version")
+        if observed is not None and observed != str(menu.version):
+            return render(request, "menus/action_error.html", {"week": week}, status=409)
+        if request.method == "POST" and action == "skip" and slot.state != "selected":
+            return menu_action(request, week.isoformat(), day, meal, action)
         if slot.state != "selected":
             raise Http404()
         return render(request, "menus/confirm.html", {
@@ -198,7 +174,6 @@ def menu_confirm(request, week, day, meal, action):
         })
     except (DatabaseError, ValueError, KeyError):
         return unavailable()
-
 
 
 @require_http_methods(["GET"])
@@ -214,7 +189,8 @@ def move_choice(request, week, day, meal):
             return HttpResponse("Aquesta setmana és només de consulta.", status=403)
         context = {"week": week, "day": day, "meal": meal, "menu": menu}
         if "destination_day" not in request.GET and "destination_meal" not in request.GET:
-            context["choices"] = [(d, DAYS[d], m, MEALS[m], menu.slots[(d, m)])
+            context["choices"] = [(d, DAYS[d], m, MEALS[m], menu.slots[d, m],
+                                   "exchange" if menu.slots[d, m].state == "selected" else "move")
                                   for d in range(7) for m in MEALS if (d, m) != (day, meal)]
             return render(request, "menus/move.html", context)
         try:
@@ -252,7 +228,7 @@ def move_action(request, week, action):
             messages.info(request, "No s’ha fet cap canvi")
         else:
             messages.success(request, {"move": "Plat mogut", "exchange": "Plats intercanviats", "undo": "Canvi desfet"}[action])
-        return redirect("menu_week", week=week.isoformat())
+        return command_done(request, "menu_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
     except PlanningConflict:

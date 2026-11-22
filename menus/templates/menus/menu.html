@@ -1,23 +1,23 @@
 {% extends "menus/base.html" %}
 {% load menus_format %}
 {% block title %}Menú setmanal{% endblock %}
+{% block notices %}{% endblock %}
 {% block content %}
-<h1>Menú setmanal</h1>
+<div class="toolbar screen-heading week-heading">
+  <h1>Menú setmanal</h1>
+  <div class="toolbar week-feedback">
+    {% include "menus/components/messages.html" %}
+    {% if editable and menu.undo %}
+      <form method="post" action="{% url 'move_action' week|date:'Y-m-d' 'undo' %}">
+        {% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}">
+        <button>{% include "menus/components/icon.html" with name="restore" only %}Desfés</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
 {% include "menus/components/week_nav.html" %}
 {% if not editable %}<p class="notice">Setmana passada · només consulta</p>{% endif %}
-{% if not menu %}
-  {% if editable %}
-    <form class="toolbar week-actions" method="post" action="{% url 'menu_create' week|date:'Y-m-d' %}">
-      {% csrf_token %}<button class="primary">{% include "menus/components/icon.html" with name="plus" only %}Crea el menú</button>
-    </form>
-  {% else %}<p class="empty">No hi ha cap menú per a aquesta setmana.</p>{% endif %}
-{% endif %}
-{% if editable and menu.undo %}
-  <form class="toolbar week-actions" method="post" action="{% url 'move_action' week|date:'Y-m-d' 'undo' %}">
-    {% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}">
-    <button>{% include "menus/components/icon.html" with name="restore" only %}Desfés</button>
-  </form>
-{% endif %}
+{% if not menu %}<p class="empty">No hi ha cap menú per a aquesta setmana.</p>{% endif %}
 {% if days %}
 <div class="week">
   {% for day, label, day_date, is_today, meals in days %}
@@ -28,25 +28,35 @@
       </h2>
       <div class="meals">
         {% for meal, meal_label, slot, key, category in meals %}
-          {% if menu %}
-            {% if slot.state == 'selected' %}{% firstof slot.dish.name as name %}{% elif slot.state == 'skipped' %}{% firstof "Omès" as name %}{% elif editable %}{% firstof "Tria un plat" as name %}{% else %}{% firstof "Pendent" as name %}{% endif %}
-            {% url 'slot_detail' week|date:'Y-m-d' day meal as detail_url %}
-            <a class="slot {{ slot.state }}" href="{% if editable and slot.state == 'pending' %}{% url 'menu_picker' week|date:'Y-m-d' day meal %}{% else %}{{ detail_url }}{% endif %}"
-              {% if editable and slot.state != 'pending' %}data-sheet="slot-{{ day }}-{{ meal }}" data-heading="{{ label }} · {{ meal_label }}"{% endif %}
-              aria-label="{{ label }}, {{ meal_label }}: {{ name }} · {{ category|category_display:key }}">
-              <span class="slot-meta">{% include "menus/components/category.html" with key=key label=category only %}<span class="meta-divider" aria-hidden="true">·</span>{{ meal_label }}</span>
+          {% url 'slot_detail' week|date:'Y-m-d' day meal as detail_url %}
+          {% if slot.state == 'pending' and editable %}
+            <a class="slot pending" href="{% url 'menu_picker' week|date:'Y-m-d' day meal %}"
+              aria-label="{{ label }}, {{ meal_label }}, pendent.{% if key %} Suggeriment de la plantilla: {{ category|category_display:key }}.{% endif %} Tria un plat">
+              <span class="slot-meta">{{ meal_label }}</span>
+              {% if key %}<span class="slot-suggestion">{% include "menus/components/category.html" with key=key label=category only %}</span>{% endif %}
+              <span class="slot-choose">Tria un plat</span>
+            </a>
+          {% elif slot.state == 'selected' or editable %}
+            {% firstof slot.dish.name "Omès" as name %}
+            <a class="slot {{ slot.state }}" href="{{ detail_url }}"
+              {% if editable %}data-sheet="slot-{{ day }}-{{ meal }}" data-heading="{{ label }} · {{ meal_label }}"{% endif %}
+              aria-label="{{ label }}, {{ meal_label }}: {{ name }}">
+              <span class="slot-meta">
+                {% if slot.dish %}{% include "menus/components/category.html" with key=slot.dish.primary_category.key label=slot.dish.primary_category.name only %}<span class="meta-divider" aria-hidden="true">·</span>
+                {% else %}{% include "menus/components/icon.html" with name="skip" only %}{% endif %}{{ meal_label }}
+              </span>
               <strong title="{{ name }}">{{ name }}</strong>
             </a>
-            {% if editable and slot.state != 'pending' %}
+            {% if editable %}
               <template id="slot-{{ day }}-{{ meal }}">
                 <p class="hint">{{ name }}</p>
                 {% include "menus/components/slot_actions.html" with in_sheet=True %}
               </template>
             {% endif %}
           {% else %}
-            <div class="slot preview">
+            <div class="slot {{ slot.state }}">
               <span class="slot-meta">{{ meal_label }}</span>
-              <strong class="category-display">{% include "menus/components/category.html" with key=key label=category only %}</strong>
+              <strong>{% if slot.state == 'skipped' %}Omès{% else %}Pendent{% endif %}</strong>
             </div>
           {% endif %}
         {% endfor %}

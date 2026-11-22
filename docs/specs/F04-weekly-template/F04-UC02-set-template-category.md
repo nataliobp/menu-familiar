@@ -16,7 +16,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 
 ## Main scenario and postconditions
 
-1. Tap position, select category from 13 labels, save.
+1. Tap position, tap one of the 13 categories to save immediately.
 2. Validate position/category and current version; update one suggestion only, preserve other 13; no-op same value.
 3. Commit then display `Plantilla actualitzada`. No existing week mutations.
 
@@ -29,7 +29,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 
 - Set lunch suggestion then change to B; reload retains B, other positions identical.
 - Save same value no version bump; stale tab cannot overwrite newer edit.
-- After M2 existing menu labels unchanged when template changes; newly created week copies latest labels.
+- Empty slots in existing and virtual editable weeks show the latest hint on the next render. Selected, skipped and historical slots do not show a live hint.
 
 ## Implementation tasks and boundaries
 

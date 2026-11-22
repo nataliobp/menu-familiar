@@ -2,7 +2,8 @@ from datetime import date, timedelta
 from uuid import uuid4
 from django.test import TestCase
 from menus.application.dishes import DishConflict, create_dish, update_dish
-from menus.application.planning import create_menu, change_menu
+from menus.application.planning import change_menu
+from menus.tests.planning_fixtures import create_legacy_menu
 from menus.domain.dish_edit import DishInput
 from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import DjangoPlanningRepository
@@ -39,7 +40,7 @@ class DishTests(TestCase):
         data = DishInput("Plat", "cereals", frozenset(), "both", False)
         dish_id = create_dish(dishes, data, uuid4())
         for target in (week, week + timedelta(days=7)):
-            create_menu(plans, Clock(week), target)
+            create_legacy_menu(plans, target)
             change_menu(plans, Clock(week), target, (0, "lunch"), 1, "assign", dish_id)
         update_dish(dishes, Clock(week + timedelta(days=7)), dish_id, DishInput("Nou", "eggs", frozenset(), "both", False), 1)
         self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["name"], "Plat")
@@ -51,7 +52,7 @@ class DishTests(TestCase):
         dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         draft = recipe_content("", [{"name": "Arròs", "quantity": "", "unit": "g"}])
         save_recipe(dishes, Clock(week), dish_id, 1, draft)
@@ -72,7 +73,7 @@ class DishTests(TestCase):
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
         save_recipe(dishes, Clock(week), dish_id, 1, recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True), True)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {"key": "arròs", "family": "g", "quantity": "200"})
         change_menu(plans, Clock(week), week, (0, "lunch"), 2, "remove")
@@ -86,7 +87,7 @@ class DishTests(TestCase):
         from menus.models import ManualShoppingItemRecord
         plans, shopping = DjangoPlanningRepository(), DjangoShoppingRepository()
         week = date(2026, 11, 16)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         data = {"name": "Pa", "quantity": "", "unit": "", "token": str(uuid4())}
         mutate_shopping(shopping, Clock(week), week, 1, 0, "manual_add", data)
         item = ManualShoppingItemRecord.objects.get()
@@ -103,7 +104,7 @@ class DishTests(TestCase):
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
         for target in (week, week + timedelta(days=7)):
-            create_menu(plans, Clock(week), target)
+            create_legacy_menu(plans, target)
             change_menu(plans, Clock(week), target, (0, "lunch"), 1, "assign", dish_id)
         original = DjangoPlanningRepository.save
         def fail_later(repository, menu, version):
@@ -126,7 +127,7 @@ class DishTests(TestCase):
         dish_id = create_dish(dishes, DishInput("Plat A", "cereals", frozenset(), "both", False), uuid4())
         first = recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
         save_recipe(dishes, Clock(week), dish_id, 1, first, True)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         key = {"key": "arròs", "family": "g"}
         mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {**key, "quantity": "200"})
@@ -152,7 +153,7 @@ class DishTests(TestCase):
         dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat A", "cereals", frozenset(), "both", False), uuid4())
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         change_menu(plans, Clock(week), week, (0, "lunch"), 2, "remove")
         content = recipe_content("", [])
@@ -175,7 +176,7 @@ class DishTests(TestCase):
         first = recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True)
         save_recipe(dishes, Clock(old_week), dish_id, 1, first, True)
         for week in (old_week, next_week):
-            create_menu(plans, Clock(old_week), week)
+            create_legacy_menu(plans, week)
             change_menu(plans, Clock(old_week), week, (0, "lunch"), 1, "assign", dish_id)
         second = recipe_content("Cou", [{"name": "Arròs", "quantity": "300", "unit": "g"}], True)
         save_recipe(dishes, Clock(next_week), dish_id, 2, second, True)
@@ -187,7 +188,7 @@ class DishTests(TestCase):
         from menus.models import GeneratedOverlayRecord, ShoppingStateRecord
         week = date(2026, 11, 16)
         plans = DjangoPlanningRepository()
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         state = ShoppingStateRecord.objects.create(week_id=week)
         with self.assertRaises(IntegrityError), transaction.atomic():
             GeneratedOverlayRecord.objects.create(shopping=state, ingredient_key="sal", family="taste", last_name="Sal", adjusted_quantity="1.000")
@@ -202,7 +203,7 @@ class DishTests(TestCase):
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat", "cereals", frozenset(), "both", False), uuid4())
         save_recipe(dishes, Clock(week), dish_id, 1, recipe_content("Cou", [{"name": "Arròs", "quantity": "160", "unit": "g"}], True), True)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         key = {"key": "arròs", "family": "g"}
         mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {**key, "quantity": "160"})
@@ -220,7 +221,7 @@ class DishTests(TestCase):
         week = date(2026, 11, 16)
         a = create_dish(dishes, DishInput("Plat A", "cereals", frozenset(), "both", False), uuid4())
         b = create_dish(dishes, DishInput("Plat B", "eggs", frozenset(), "both", False), uuid4())
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", a)
         change_menu(plans, Clock(week), week, (2, "lunch"), 2, "assign", b)
         move_or_undo(plans, Clock(week), week, 3, (0, "lunch"), (1, "lunch"))
@@ -238,7 +239,7 @@ class DishTests(TestCase):
         dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat sintètic", "cereals", frozenset(), "both", False), uuid4())
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         set_archived(dishes, dish_id, 1, True)
         self.assertIsNone(plans.dish_snapshot(dish_id))
@@ -254,7 +255,7 @@ class DishTests(TestCase):
         from menus.models import ManualShoppingItemRecord
         plans, shopping = DjangoPlanningRepository(), DjangoShoppingRepository()
         week = date(2026, 11, 16)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         mutate_shopping(shopping, Clock(week), week, 1, 0, "manual_add", {"name": "Pa", "quantity": "2", "unit": "unit", "token": str(uuid4())})
         item_id = ManualShoppingItemRecord.objects.get().pk
         mutate_shopping(shopping, Clock(week), week, 1, 1, "manual_check", {"id": item_id, "checked": "1"})
@@ -277,7 +278,7 @@ class DishTests(TestCase):
         from menus.models import GeneratedOverlayRecord, ShoppingStateRecord
         plans = DjangoPlanningRepository()
         week = date(2026, 11, 16)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         state = ShoppingStateRecord.objects.create(week_id=week)
         GeneratedOverlayRecord.objects.create(shopping=state, ingredient_key="arròs", family="g", last_name="Arròs", last_base_quantity="100.000", adjusted_quantity="1e3")
         with self.assertRaises(DataIntegrityError):
@@ -295,7 +296,7 @@ class DishTests(TestCase):
         week = date(2026, 11, 16)
         dish_id = create_dish(dishes, DishInput("Plat sintètic", "cereals", frozenset(), "both", False), uuid4())
         save_recipe(dishes, Clock(week), dish_id, 1, recipe_content("Cou", [{"name": "Arròs", "quantity": "1", "unit": "g"}], True), True)
-        create_menu(plans, Clock(week), week)
+        create_legacy_menu(plans, week)
         change_menu(plans, Clock(week), week, (0, "lunch"), 1, "assign", dish_id)
         maximum = "1399999999998600.000"
         mutate_shopping(shopping, Clock(week), week, 2, 0, "adjust", {"key": "arròs", "family": "g", "quantity": maximum})

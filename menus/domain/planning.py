@@ -34,9 +34,8 @@ class WeeklyMenu:
             raise ValueError("Invalid menu")
 
     @classmethod
-    def from_template(cls, week, template, categories):
-        return cls(week, 1, {position: Slot((key, categories[key]) if key else None)
-                             for position, key in template.slots.items()})
+    def empty(cls, week):
+        return cls(week, 1, {position: Slot(None) for position in POSITIONS})
 
     def select(self, position, dish, replace=False):
         slot = self.slots[position]

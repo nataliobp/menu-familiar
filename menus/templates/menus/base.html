@@ -13,14 +13,14 @@
     <a class="brand" href="{% url 'current_menu' %}">{% include "menus/components/icon.html" with name="plate" only %}Menú Familiar</a>
   </header>
   <main id="contingut">
-    {% for message in messages %}<p class="notice{% if message.tags == 'success' %} success{% endif %}" role="status">{{ message }}</p>{% endfor %}
+    {% block notices %}{% include "menus/components/messages.html" %}{% endblock %}
     {% block content %}{% endblock %}
   </main>
   <nav class="module-nav" aria-label="Navegació principal">
     <div class="nav-inner">
       <a href="{% if week %}{% url 'menu_week' week|date:'Y-m-d' %}{% else %}{% url 'current_menu' %}{% endif %}"
          {% if "/menu/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="calendar" only %}Menú setmanal</a>
-      <a href="{% url 'weekly_template' %}" {% if "/plantilla/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="grid" only %}Plantilla</a>
+      <a href="{% url 'weekly_template' %}{% if week %}?week={{ week|date:'Y-m-d' }}{% endif %}" {% if "/plantilla/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="grid" only %}Plantilla</a>
       <a href="{% url 'catalogue' %}" {% if "/plats/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="plate" only %}Plats</a>
       <a href="{% if week %}{% url 'shopping_week' week|date:'Y-m-d' %}{% else %}{% url 'current_shopping' %}{% endif %}"
          {% if "/compra/" in request.path %}aria-current="page"{% endif %}>{% include "menus/components/icon.html" with name="basket" only %}Llista de la compra</a>
@@ -34,5 +34,21 @@
     </div>
     <div data-sheet-content></div>
   </dialog>
+  <dialog id="confirmation" class="sheet" aria-labelledby="confirmation-title" aria-describedby="confirmation-description">
+    <h2 id="confirmation-title"></h2>
+    <div data-confirm-content></div>
+    <div class="error" data-command-error role="alert" tabindex="-1" hidden></div>
+    <a class="button" data-command-review hidden>Revisa el contingut actual</a>
+  </dialog>
+  <template id="confirmation-failure">
+    <section>
+      <h1 data-confirm-heading></h1>
+      <p data-confirm-description>Actualitza la pàgina i torna-ho a provar.</p>
+      <div class="toolbar">
+        <button type="button" data-confirm-cancel>Cancel·la</button>
+        <a class="button" data-confirm-reload>Revisa el contingut actual</a>
+      </div>
+    </section>
+  </template>
 </body>
 </html>

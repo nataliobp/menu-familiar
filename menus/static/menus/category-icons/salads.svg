@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Amanides</title>
+<path d="M9 36h46c-2 11-10 18-23 18S11 47 9 36Z" fill="#e7b8a0" stroke="#a27566" stroke-width="2.5"/>
+  <path d="M17 35c-9-6-3-19 6-16-2-12 11-14 15-5 10-4 17 4 12 13 9 6 2 14-8 12Z" fill="#8cc776" stroke="#4c8c57" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M20 34c2-6 7-4 11-12M33 37c-3-7 6-14 11-15" fill="none" stroke="#5e9e5e" stroke-width="2"/>
+  <circle cx="24" cy="32" r="5" fill="#ec6b5c" stroke="#b34d45" stroke-width="1.5"/><circle cx="42" cy="32" r="4.5" fill="#e76c52" stroke="#b34d45" stroke-width="1.5"/>
+</svg>

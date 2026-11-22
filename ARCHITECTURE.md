@@ -2,7 +2,7 @@
 
 ## Purpose and principles
 
-The application plans family meals and shopping lists as specified in `SPEC.md`, which remains the authority for functional behavior. Implementations must follow Domain-Driven Design (DDD), hexagonal architecture (ports and adapters), dependency inversion, and use case driven development. Apply these principles to protect important behavior and family data, not to add layers for their own sake. Introduce an abstraction only when it expresses a real boundary or rule; do not add dependencies, generic frameworks, or functionality in anticipation of future needs. Defer implementation details until the corresponding use cases are specified. The application has no application-level authentication or access management.
+The application plans family meals and shopping lists as specified in `SPEC.md` and the [V2.2 product corrections](docs/specs/V2.1-V2.2.md). Implementations must follow Domain-Driven Design (DDD), hexagonal architecture (ports and adapters), dependency inversion, and use case driven development. Apply these principles to protect important behavior and family data, not to add layers for their own sake. Introduce an abstraction only when it expresses a real boundary or rule; do not add dependencies, generic frameworks, or functionality in anticipation of future needs. Defer implementation details until the corresponding use cases are specified. The application has no application-level authentication or access management.
 
 ## Packages and responsibilities
 
@@ -31,8 +31,8 @@ Ports describe capabilities required by use cases, expressed in domain or applic
 
 Model concepts and invariants from the specification in plain Python. Entities have identity and a lifecycle; value objects represent values and validate their own meaning where useful. Aggregates are consistency boundaries: changes that must be valid together are enforced through their root and persisted atomically. Choose boundaries around actual invariants, not database tables.
 
-- A weekly menu is a natural aggregate for its 14 slots, their pending, selected, or skipped states, copied category suggestions, and planning edits. A slot has at most one selected dish. Moves and exchanges affect both slots together. The latest move or exchange can be undone only until another planning edit invalidates it.
-- A reusable weekly template owns its suggestions independently. Creating a week copies them; later template edits do not change that week.
+- A weekly menu is a natural aggregate for its 14 slots, their pending, selected, or skipped states, legacy suggestion snapshots, and planning edits. A slot has at most one selected dish. Moves and exchanges affect both slots together. The latest move or exchange can be undone only until another planning edit invalidates it.
+- A reusable weekly template owns its suggestions independently. Reads project the current suggestions into empty editable slots. Template edits leave stored menus and historical snapshots intact.
 - Dishes and recipes have their own identities and editing lifecycles. Category membership, meal preference, and special-occasion status guide selection without restricting eligibility. Recipe information may be incomplete; quantities must never be invented.
 - Past weekly menus are read-only, with copied dish and recipe values and versioned historical shopping derivation. Monday in Europe/Madrid determines classification. Editable snapshots and shopping state propagate atomically under the [time and persistence contracts](docs/specs/04-persistence.md#concurrency-and-atomicity).
 - Shopping-list state belongs to a week and includes manual products, generated-item adjustments, checked state, and visible orphaned adjustments. Refresh preserves matching state and does not silently discard orphaned adjustments.
@@ -41,7 +41,7 @@ Use value objects where they clarify rules, for example a meal slot, quantity an
 
 ## Use cases and orchestration
 
-Each user intention should have an explicit application entry point, such as creating a week from a template, selecting or replacing a dish, moving or exchanging slots, undoing a move, editing a recipe, or refreshing a shopping list. A use case validates its inputs, loads the necessary state through ports, calls domain behavior, coordinates persistence within a transaction where required, and returns framework-independent results or errors. It does not implement presentation or SQL. Keep related simple operations together when separate classes would add ceremony without clarity.
+Each user intention should have an explicit application entry point, such as selecting or replacing a dish, including the first edit of an unpersisted week, moving or exchanging slots, undoing a move, editing a recipe, or refreshing a shopping list. A use case validates its inputs, loads the necessary state through ports, calls domain behavior, coordinates persistence within a transaction where required, and returns framework-independent results or errors. It does not implement presentation or SQL. Keep related simple operations together when separate classes would add ceremony without clarity.
 
 Use cases must enforce past-week read-only behavior at the application boundary as well as in the interface, preserve historical data, and update affected current and future shopping lists when recipes change or an editable week is changed. Count every planned occurrence, report missing recipe information, combine only compatible ingredients, and retain manual and adjusted list state as specified. Use cases are the preferred entry points for web actions and imports so that alternate adapters cannot bypass invariants.
 

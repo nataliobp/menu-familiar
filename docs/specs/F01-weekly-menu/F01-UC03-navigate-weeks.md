@@ -17,7 +17,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 ## Main scenario and postconditions
 
 1. Use previous/next or return `Avui`. Load target by date; missing past shows empty read-only state; missing future/current offers create.
-2. No data copied between existing weeks; create uses current template only. Keep selected week in links to shopping and picker.
+2. No data is copied between weeks. The current template supplies hints when loading an editable week. Keep selected week in links to shopping and picker.
 3. Apply historic guard in all POST actions, including earlier cases and later shopping; recency query spans persisted weeks.
 
 ## Alternative and failure flows

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Sopes</title>
+<path d="M9 30h46c-2 14-8 22-23 22S11 44 9 30Z" fill="#d16d52" stroke="#975341" stroke-width="2.5"/>
+  <ellipse cx="32" cy="29" rx="23" ry="9" fill="#f7eee0" stroke="#975341" stroke-width="2.5"/>
+  <ellipse cx="32" cy="29" rx="18" ry="5.2" fill="#d59c4f"/>
+  <path d="M19 29c4-4 5 3 9 0s5-1 8 0 5-3 9-1" stroke="#f8df8e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M47 13l-9 18" stroke="#a9b4bd" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="36" cy="33" rx="5" ry="3" transform="rotate(-30 36 33)" fill="#bbc6c7"/>
+  <path d="M21 12q-3 4 0 9M30 9q-3 4 0 9" fill="none" stroke="#90a5a2" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

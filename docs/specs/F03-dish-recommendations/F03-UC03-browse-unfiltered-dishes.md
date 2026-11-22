@@ -16,7 +16,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 
 ## Main scenario and postconditions
 
-1. Open unfiltered picker (M2 initial default), or press `Mostra tots els plats` from suggestions; clear category but retain or explicitly clear search.
+1. Open unfiltered picker (M2 initial default), or choose `Totes les categories` from the category filter. The search text stays in place.
 2. List all active candidates, once per dish; after ranking introduced apply full ordering even without category filter.
 3. Selecting invokes assign/replace POST, not GET; show cancel and return to suggestion filter.
 

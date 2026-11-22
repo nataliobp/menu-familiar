@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Peix</title>
+<path d="M14 31 3 20v24l11-10" fill="#4fa7b4" stroke="#347d88" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M12 32c10-14 30-17 48 0-18 17-38 14-48 0Z" fill="#73c2c7" stroke="#347d88" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="m31 21 5-10 8 9m-9 24 7 10 5-14" fill="#4fa7b4" stroke="#347d88" stroke-width="2.2" stroke-linejoin="round"/>
+  <circle cx="47" cy="29" r="3" fill="#294a4d"/><path d="M51 38q-5 2-8 0" fill="none" stroke="#347d88" stroke-width="2"/>
+  <path d="M24 29q5 3 0 7" fill="none" stroke="#4093a1" stroke-width="2"/>
+</svg>

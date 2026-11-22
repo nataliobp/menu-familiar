@@ -1,5 +1,5 @@
-{% if error %}<p class="error" id="filter-error" role="alert" tabindex="-1" autofocus>{{ error }}</p>{% endif %}
-<form method="get" class="filters">
+<p class="error" id="filter-error" role="alert"{% if not error %} hidden{% endif %}>{{ error|default_if_none:"" }}</p>
+<form method="get" class="filters" data-live-filters>
   {% if action %}<input type="hidden" name="action" value="{{ action }}">{% else %}<input type="hidden" name="archived" value="{{ archived|yesno:'1,0' }}">{% endif %}
   <label for="q" class="sr-only">Cerca un plat</label>
   <div class="icon-field">
@@ -9,13 +9,16 @@
   <div class="toolbar filter-options">
     <label for="category" class="sr-only">Categoria</label>
     <div class="icon-field">
-      {% include "menus/components/icon.html" with name="filter" only %}
+      <span class="filter-icon" data-filter-icon>
+        {% for key, name in categories %}{% if category == key %}{% include "menus/components/category.html" with key=key label=name only %}{% endif %}{% endfor %}
+        {% if not category or error %}{% include "menus/components/icon.html" with name="filter" only %}{% endif %}
+      </span>
       <select id="category" name="category" {% if error %}aria-describedby="filter-error"{% endif %}>
         <option value="">Totes les categories</option>
         {% for key, name in categories %}<option value="{{ key }}" {% if category == key %}selected{% endif %}>{{ name }}</option>{% endfor %}
       </select>
     </div>
-    <button>Cerca</button>
-    {% if not error %}<span class="result-count">{{ dishes|length }} {% if dishes|length == 1 %}plat{% else %}plats{% endif %}</span>{% endif %}
+    <button data-filter-submit>Cerca</button>
+    <span class="result-count" role="status" data-filter-count>{% if not error %}{{ dishes|length }} {% if dishes|length == 1 %}plat{% else %}plats{% endif %}{% endif %}</span>
   </div>
 </form>

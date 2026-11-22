@@ -16,7 +16,7 @@ from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 from menus.infrastructure.django_dishes import DjangoDishRepository
 from menus.infrastructure.django_planning import MadridClock
 from menus.infrastructure.django_template import DjangoTemplateRepository
-from menus.web.common import MEALS, filter_error, unavailable
+from menus.web.common import MEALS, command_done, filter_error, unavailable
 from menus.web.presentation import catalogue_groups, category_options, recipe_read_context
 
 
@@ -153,12 +153,14 @@ def dish_archive(request, dish_id, action):
     dish = get_dish(DjangoCatalogueQueries(), dish_id)
     if not dish:
         raise Http404()
+    if request.method == "GET" and request.GET.get("version", str(dish.version)) != str(dish.version):
+        return render(request, "menus/action_error.html", {}, status=409)
     if request.method == "POST":
         try:
             version = int(request.POST.get("version", ""))
-            if request.POST.get("confirm") == "yes":
+            if action == "restore" or request.POST.get("confirm") == "yes":
                 set_archived(DjangoDishRepository(), dish_id, version, action == "archive")
-                return redirect("dish_detail", dish_id=dish_id)
+                return command_done(request, "dish_detail", dish_id=dish_id)
             if version != dish.version:
                 raise DishConflict()
         except (ValueError, TypeError):

@@ -15,7 +15,7 @@ Tests are part of the implementation, not a later feature. Use `unittest` / Djan
 | ID | Given / When / Then | Primary coverage |
 |---|---|---|
 | QA-01 | Empty DB, seed category migration and corrected local CSV: import success, compare every required field; repeated identical import no changes. Synthetic malformed and conflict cases rollback; private check separate. | M0 |
-| QA-02 | Set Monday lunch category, leave another free; reload from new browser; create week; edit template; existing suggestions remain. | F04/F01 |
+| QA-02 | Set Monday lunch category, leave another free; reload from new browser; assign to create the week; change the template; empty editable slots follow, while chosen dishes and historical snapshots stay intact. | F04/F01 |
 | QA-03 | Start empty week; choose unrestricted dish, replace with another, remove; unrelated slots unchanged; repeat selection in another slot allowed. | F01/F02 |
 | QA-04 | Candidates with multiple categories, preferred/unpreferred, special/normal, planned/never, tied IDs. Filter union no duplicates; exact rank ordinary preferred never, ordinary preferred older before newer, ordinary opposite, then analogous special tiers; `both` equals preferred. Search and all retains eligibility/ranks; archived not shown. | F03 |
 | QA-05 | Frozen local Sunday then Monday boundary; create current/future, navigate absent past, existing past read-only. Attempt POST on every historical mutation, verify DB unchanged; earlier current-week slots still editable. | F01/F02/F07 |
@@ -35,7 +35,7 @@ Tests are part of the implementation, not a later feature. Use `unittest` / Djan
 | Gate | Required coverage |
 |---|---|
 | M0 | Fresh migration and populated upgrade from 0001, invalid legacy data rollback, and subsequent automatic IDs. Synthetic unordered header, quoted multi-category field and conflict rollback. Record private fidelity separately. |
-| M2 | Template copying, stale writes, read-only guard, all ranking tiers and picker normalization vectors. |
+| M2 | Virtual weeks, live template suggestions, stale writes, read-only guard, all ranking tiers and picker normalization vectors. |
 | M3 | Madrid Sunday/Monday rollover before the final clock check, DST calendar and year navigation, future recency, past direct-write refusal. |
 | M4 | Move, exchange, undo and rollback. M5/M6 verify that related snapshot refresh invalidates undo and unrelated refresh rebases it. |
 | M5 | Dish lost response and concurrent same token, payload mismatch conflict, rollback then retry, assignment racing archival, and catalogue search on composed and decomposed accents. |
@@ -52,7 +52,7 @@ Use a disposable DB and synthetic seed first. Set real local `DJANGO_DB_PATH` to
 1. M0: check 13 category labels, upgrade a populated synthetic database, and import synthetic and private data independently to disposable databases; run identical rerun; exercise partial match, conflict and malformed file; inspect counts, no other changes; run checks and test suite. Owner may inspect real values locally. Do not require a temporary catalogue GUI to prove import.
 2. M1: open template on mobile and tablet, set/modify/clear category, refresh; verify all 14 positions and no menu creation side effects.
 3. M2: create current menu, select any dish without filter, replace/remove, apply category filter/search, skip/reactivate, use unrelated category and opposite preference; see exact priority order with synthetic fixtures. Refresh from second device.
-4. M3: navigate last/next/current; create future plan; edit past day of current week; past menu read-only including direct POST in automated test; verify independent template labels and ranked suggestions across weeks.
+4. M3: navigate last/next/current; create future plan; edit past day of current week; past menu read-only including direct POST in automated test; verify live hints in empty editable slots and ranked suggestions across weeks.
 5. M4: move, swap, confirm/cancel skipped destination, undo; another edit invalidates; try stale tabs. Same shopping totals for unchanged occurrences when M7 present.
 6. M5/M6: create synthetic dish, edit metadata, archive/restore; view pending recipe, save draft, fix invalid numeric field, publish, edit draft and republish; verify current/future vs past.
 7. M7: generated sums, repeated occurrences, incompatible units, taste rows, warning, extras, overrides, check, orphan/reset/reappear. Edit menu/recipe and revisit from second screen. Future editable, historical immutable.

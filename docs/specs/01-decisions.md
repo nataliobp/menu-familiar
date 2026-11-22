@@ -5,8 +5,8 @@ This record consolidates the approved V1 product rules and the technical default
 | ID | Decision / rationale | Status |
 |---|---|---|
 | D01 | Weeks start Monday in Europe/Madrid. Monday date is the identity. Current and future weeks are editable; past weeks are read-only and cannot be backfilled. The final transaction clock check governs rollover. | V1 baseline |
-| D02 | Create a week explicitly and idempotently by Monday date from the current template. GET never creates it. A missing editable week shows a 14-position preview and one create action. | V1 baseline |
-| D03 | The singleton template owns exactly 14 optional suggestions. Lliure means no suggestion. Creation copies suggestions and labels into the week. | V1 baseline |
+| D02 | Render 14 usable positions for a missing editable week. Create it by Monday date on the first valid mutation, atomically with that change. GET never creates it. | V2.2 |
+| D03 | The singleton template owns exactly 14 optional suggestions. Lliure means no suggestion. Editable pending slots read live suggestions. Legacy copies remain stored and do not represent explicit overrides. | V2.2 |
 | D04 | Removal makes a selected slot pending. Skipping a selected slot requires confirmation. Direct selection into an omitted slot requires explicit reactivation first. | V1 baseline |
 | D05 | Move or exchange within a week. Confirm a move into a skipped slot. Keep suggestions at their positions. Single-level undo survives reload and unrelated refreshes, but expires on a subsequent successful planning edit or changed snapshot of either position. | V1 baseline |
 | D06 | Rank ordinary before special, preferred or both before opposite, never planned before oldest to newest, then by ID. Include all persisted meal dates, including future. Filter any category membership. Case- and accent-insensitive search does not change ranking or eligibility. | V1 baseline |

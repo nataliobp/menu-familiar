@@ -7,7 +7,8 @@ from django.db import OperationalError
 from django.test import TestCase
 from django.urls import reverse
 
-from menus.application.planning import change_menu, create_menu, move_or_undo
+from menus.application.planning import change_menu, move_or_undo
+from menus.tests.planning_fixtures import create_legacy_menu
 from menus.application.recipes import save_recipe
 from menus.domain.recipe import recipe_content
 from menus.infrastructure.django_dishes import DjangoDishRepository
@@ -26,7 +27,7 @@ class ReviewRegressions(TestCase):
         self.repo = DjangoPlanningRepository()
         self.dish = self.make_dish("Plat sintètic")
         self.other = self.make_dish("Altre plat")
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         fake = patch("menus.infrastructure.django_planning.MadridClock.today", return_value=self.week)
         fake.start()
@@ -120,7 +121,7 @@ class ReviewRegressions(TestCase):
 
     def test_menu_shopping_navigation_preserves_each_week(self):
         historic = self.week - timedelta(days=7)
-        create_menu(self.repo, Clock(historic), historic)
+        create_legacy_menu(self.repo, historic)
         for week in (historic, self.week, self.week + timedelta(days=7)):
             plan = reverse("menu_week", args=[week.isoformat()])
             shopping = reverse("shopping_week", args=[week.isoformat()])
@@ -237,10 +238,11 @@ class ReviewRegressions(TestCase):
         self.assertEqual(self.client.post(url, {**data, "checked": "1", "overlay_version": 1}).status_code, 302)
         self.assertTrue(GeneratedOverlayRecord.objects.get().checked)
 
-    def test_create_reports_success_and_identifies_active_destination(self):
+    def test_first_assignment_reports_success_and_identifies_active_destination(self):
         future = (self.week + timedelta(days=7)).isoformat()
-        response = self.client.post(reverse("menu_create", args=[future]), follow=True)
-        self.assertContains(response, "Menú setmanal creat")
+        response = self.client.post(reverse("menu_action", args=[future, 0, "lunch", "assign"]),
+                                    {"version": 0, "dish": self.dish.pk}, follow=True)
+        self.assertContains(response, "Canvi desat")
         self.assertContains(response, 'aria-current="page"')
 
     def test_recipe_read_failure_keeps_input_and_retry_cannot_save_or_rebase(self):

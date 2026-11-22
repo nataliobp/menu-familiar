@@ -1,6 +1,6 @@
 # Full implementation plan — autonomous execution
 
-Implement the consolidated baseline in vertical slices. Continue after automated checks and record owner QA separately for release. Start from the existing partial M0 implementation and preserve the working tree and migrations.
+This plan records the original V1 delivery slices. The [V2.2 product corrections](V2.1-V2.2.md) supersede its interaction contracts. Continue after automated checks and record owner QA separately for release. Start from the existing partial M0 implementation and preserve the working tree and migrations.
 
 | Slice | IDs and dependencies | Implementation / checkpoint |
 |---|---|---|

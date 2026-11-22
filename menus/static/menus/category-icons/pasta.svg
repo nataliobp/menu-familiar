@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Pasta</title>
+<path d="M9 31h46c-2 14-11 22-23 22S11 45 9 31Z" fill="#d57f6b" stroke="#995f51" stroke-width="2.5"/>
+  <ellipse cx="32" cy="30" rx="23" ry="9" fill="#f9f0d7" stroke="#995f51" stroke-width="2.5"/>
+  <path d="M15 29c6-10 10 10 16-1s12 5 18-1M16 34c8-4 13 7 20-1s9 4 13 0" fill="none" stroke="#e5ae3f" stroke-width="3.1" stroke-linecap="round"/>
+  <path d="M43 8v13m-4-13v10m8-10v10m-4 3-8 11" stroke="#9faeb1" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+</svg>

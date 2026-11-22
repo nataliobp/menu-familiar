@@ -2,7 +2,7 @@
 
 **Status: consolidated V1 implementation baseline.** This corpus specifies seven features and 30 use cases for the existing repository. The [decision record](01-decisions.md) captures the approved product rules and cross-cutting technical defaults. Interface copy is Catalan and technical documentation is English.
 
-The [V2.1–V2.2 supplement](V2.1-V2.2.md) governs the V2 presentation changes. The detailed V1 use-case contracts remain the foundation.
+The [V2.1–V2.2 supplement](V2.1-V2.2.md) takes precedence over the detailed V1 use-case contracts for the V2.2 changes. The original M0–M8 delivery plan and UX mockups remain V1 references.
 
 ## Reading order and authority
 
@@ -38,7 +38,7 @@ One household, one LAN application, one reusable template, weekly menus, catalog
 
 ### F01-weekly-menu
 
-- [F01-UC01 — Create a weekly menu](F01-weekly-menu/F01-UC01-create-weekly-menu.md)
+- [F01-UC01 — Create a weekly menu on its first edit](F01-weekly-menu/F01-UC01-create-weekly-menu.md)
 - [F01-UC02 — View a persisted weekly menu](F01-weekly-menu/F01-UC02-view-weekly-menu.md)
 - [F01-UC03 — Navigate between weekly menus](F01-weekly-menu/F01-UC03-navigate-weeks.md)
 

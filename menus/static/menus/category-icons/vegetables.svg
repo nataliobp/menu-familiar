@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Verdures</title>
+<path d="M33 19c-6-2-12-7-12-12 9 0 13 5 13 11M36 19c1-8 6-12 12-13 1 7-3 12-11 15" fill="#6fab60" stroke="#4c8650" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M32 21c-7-5-14-1-14 7 0 12 13 25 17 28 5-7 15-21 13-30-2-9-10-11-16-5Z" fill="#f39a3a" stroke="#b86a25" stroke-width="2.5"/>
+  <path d="M24 31h9M28 40h9M33 48h5" fill="none" stroke="#e27625" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

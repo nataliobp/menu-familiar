@@ -57,12 +57,12 @@ class PlanningConcurrencyTests(TransactionTestCase):
         from datetime import date
         from menus.models import DishRecord
         from menus.infrastructure.django_planning import DjangoPlanningRepository
-        from menus.application.planning import create_menu
+        from menus.tests.planning_fixtures import create_legacy_menu
         self.week = date(2026, 11, 16)
         self.clock = type("Clock", (), {"today": lambda _: self.week})()
         self.repo = DjangoPlanningRepository()
         self.dish = DishRecord.objects.create(name="Plat sintètic", primary_category_id="cereals", meal_preference="both", special_occasion=False)
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
 
     def require_file(self):
         if "mode=memory" in str(connection.settings_dict["NAME"]):
@@ -93,6 +93,38 @@ class PlanningConcurrencyTests(TransactionTestCase):
         menu = self.repo.get(self.week)
         self.assertEqual(menu.version, 2)
         self.assertEqual(sum(slot.state == "selected" for slot in menu.slots.values()), 1)
+
+    def test_concurrent_first_writes_commit_only_one_atomic_edit(self):
+        from datetime import timedelta
+        from menus.application.planning import PlanningConflict, change_menu
+        from menus.infrastructure.django_planning import DjangoPlanningRepository
+        from menus.models import MenuSlotRecord, WeeklyMenuRecord
+
+        self.require_file()
+        future = self.week + timedelta(days=7)
+        barrier = Barrier(2, timeout=10)
+
+        class SynchronizedRepository(DjangoPlanningRepository):
+            def create(self, menu):
+                barrier.wait()
+                super().create(menu)
+
+        def write(position):
+            close_old_connections()
+            try:
+                change_menu(SynchronizedRepository(), self.clock, future, position, 0, "assign", self.dish.pk)
+                return "saved"
+            except PlanningConflict:
+                return "conflict"
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(write, [(0, "lunch"), (1, "lunch")]))
+        self.assertCountEqual(results, ["saved", "conflict"])
+        self.assertEqual(WeeklyMenuRecord.objects.get(week_start=future).version, 2)
+        self.assertEqual(MenuSlotRecord.objects.filter(weekly_menu_id=future).count(), 14)
+        self.assertEqual(MenuSlotRecord.objects.filter(weekly_menu_id=future, state="selected").count(), 1)
 
     def test_competing_first_overlay_creation(self):
         from menus.application.planning import change_menu

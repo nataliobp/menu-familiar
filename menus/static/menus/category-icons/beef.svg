@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Vedella</title>
+<path d="M16 20c-5-8-9-7-10-3 0 6 6 10 13 9M48 20c5-8 9-7 10-3 0 6-6 10-13 9" fill="#e5c79c" stroke="#8c765d" stroke-width="2.2"/>
+  <path d="M16 18C12 10 18 8 24 16M48 18c4-8-2-10-8-2" fill="#f1e5cc" stroke="#8c765d" stroke-width="2"/>
+  <path d="M18 17c-5 6-5 23-2 31 3 9 30 9 33 0 3-8 3-25-3-31-7-7-20-7-28 0Z" fill="#fff7e5" stroke="#776b5b" stroke-width="2.5"/>
+  <path d="M19 19c1 10 6 12 11 11l2-16c-5-2-9 0-13 5Z" fill="#785c52"/>
+  <circle cx="26" cy="35" r="2.3" fill="#34423a"/><circle cx="41" cy="35" r="2.3" fill="#34423a"/>
+  <rect x="21" y="39" width="23" height="13" rx="7" fill="#efb5a8" stroke="#b87e73" stroke-width="1.8"/>
+  <ellipse cx="28" cy="45" rx="2.2" ry="2.8" fill="#9c625a"/><ellipse cx="38" cy="45" rx="2.2" ry="2.8" fill="#9c625a"/>
+</svg>

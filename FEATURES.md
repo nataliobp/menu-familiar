@@ -4,7 +4,7 @@ The V1 inventory defines seven features and 30 stable use-case IDs. The [detaile
 
 ## F01 — Weekly Menu
 
-- **F01-UC01:** Create a weekly menu from the reusable template.
+- **F01-UC01:** Create an editable weekly menu atomically on its first valid change.
 - **F01-UC02:** View and return to a persisted weekly menu.
 - **F01-UC03:** Navigate between weekly menus.
 
@@ -55,4 +55,4 @@ The V1 inventory defines seven features and 30 stable use-case IDs. The [detaile
 
 ## Business rules and technical tasks
 
-Rules apply across use cases rather than forming separate user goals. In particular, `SPEC.md` governs week editability and historical preservation, template copying, slot states, selection ordering, atomic moves and undo, recipe changes, and shopping-list refresh and preservation. The initial CSV import is a technical prerequisite, not a catalogue use case. Implementation and verification tasks are planned in the relevant milestone.
+Rules apply across use cases rather than forming separate user goals. In particular, `SPEC.md` governs week editability and historical preservation, live template suggestions, slot states, selection ordering, atomic moves and undo, recipe changes, and shopping-list refresh and preservation. The initial CSV import is a technical prerequisite, not a catalogue use case. Implementation and verification tasks are planned in the relevant milestone.

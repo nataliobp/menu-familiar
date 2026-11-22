@@ -199,7 +199,7 @@ Use a disposable database and synthetic dishes first. Do not run destructive or 
 
 - Import: verify the 13 categories, synthetic upgrade and import, identical rerun, conflicting data and no partial writes. Verify private source fidelity separately and locally.
 - Template: set, change and clear a category; reload and inspect all 14 positions at mobile and tablet sizes.
-- Planning: create current and future weeks; choose, replace, remove, skip and reactivate dishes; filter/search and inspect ordering; navigate weeks and verify past weeks are read-only and copied suggestions remain unchanged.
+- Planning: open and browse a missing future week, then create it by choosing or skipping a meal. Check immediate filtering, replacement, removal and reactivation, live suggestions in empty editable slots, and read-only past weeks.
 - Advanced planning: move and exchange, cancel or confirm a skipped target, undo, and verify stale tabs and later edits cannot overwrite newer data.
 - Catalogue and recipes: create, edit, archive and restore a synthetic dish; save an incomplete draft, validate bad amounts, publish and edit a later draft; compare editable weeks with frozen history.
 - Shopping: check aggregation, compatible conversions, repeated dishes, distinct units, `al gust`, incomplete coverage, manual products, adjustments, checks, orphan recovery and reset after menu and recipe changes.

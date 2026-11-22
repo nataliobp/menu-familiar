@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Cremes</title>
+<path d="M10 28h44c-1 15-7 25-22 25S11 43 10 28Z" fill="#e7a77b" stroke="#94674f" stroke-width="2.5"/>
+  <ellipse cx="32" cy="29" rx="22" ry="9" fill="#faf4d6" stroke="#94674f" stroke-width="2.5"/>
+  <ellipse cx="32" cy="29" rx="17" ry="5.5" fill="#eeb262"/>
+  <path d="M24 29q7-5 16 1" fill="none" stroke="#f8d991" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M21 57h22" stroke="#94674f" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M22 14q-3 4 0 8M31 10q-3 4 0 8M40 14q-3 4 0 8" fill="none" stroke="#8aaf8b" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

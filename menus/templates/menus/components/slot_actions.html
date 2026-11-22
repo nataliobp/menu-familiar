@@ -5,8 +5,8 @@
     {% endif %}
     <a class="button" href="{% url 'menu_picker' week|date:'Y-m-d' day meal %}?action=replace">{% include "menus/components/icon.html" with name="swap" only %}Canvia el plat</a>
     <a class="button" href="{% url 'move_choice' week|date:'Y-m-d' day meal %}">{% include "menus/components/icon.html" with name="swap" only %}Mou o intercanvia</a>
-    <a class="button danger" href="{% url 'confirm_remove' week|date:'Y-m-d' day meal %}?version={{ menu.version }}">{% include "menus/components/icon.html" with name="close" only %}Retira el plat</a>
-    <a class="button danger" href="{% url 'confirm_skip' week|date:'Y-m-d' day meal %}?version={{ menu.version }}">{% include "menus/components/icon.html" with name="skip" only %}Omet aquest àpat</a>
+    <a class="button danger" data-confirm href="{% url 'confirm_remove' week|date:'Y-m-d' day meal %}?version={{ menu.version }}">{% include "menus/components/icon.html" with name="close" only %}Retira el plat</a>
+    <a class="button danger" data-confirm href="{% url 'confirm_skip' week|date:'Y-m-d' day meal %}?version={{ menu.version }}">{% include "menus/components/icon.html" with name="skip" only %}Omet aquest àpat</a>
   {% elif slot.state == 'skipped' %}
     <form method="post" action="{% url 'menu_action' week|date:'Y-m-d' day meal 'reactivate' %}">
       {% csrf_token %}<input type="hidden" name="version" value="{{ menu.version }}">

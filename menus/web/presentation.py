@@ -2,8 +2,17 @@
 
 from datetime import date, timedelta
 
+from menus.domain.categories import CATEGORIES
 from menus.domain.planning import MAX_WEEK_START
 from menus.domain.recipe import effective_recipe, validate_content
+
+
+CATEGORY_ART = {key: f"menus/category-icons/{key}.svg" for key, _ in CATEGORIES}
+FREE_CATEGORY_ART = "menus/category-icons/free.svg"
+
+
+def category_art(key):
+    return CATEGORY_ART.get(key, FREE_CATEGORY_ART)
 
 
 def category_label(key, name):

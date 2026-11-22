@@ -11,7 +11,7 @@
       <h2><span class="full-day">{{ day }}</span><abbr title="{{ day }}" aria-hidden="true">{{ index|weekday_short_ca }}</abbr></h2>
       <div class="meals">
         {% for meal, label, key, category in meals %}
-          <a class="slot template-slot" href="{% url 'template_edit' index meal %}" data-category="{{ key }}" data-category-trigger data-heading="{{ day }} · {{ label }}">
+          <a class="slot template-slot" href="{% url 'template_edit' index meal %}{% if week %}?week={{ week|date:'Y-m-d' }}{% endif %}" data-category="{{ key }}" data-category-trigger data-heading="{{ day }} · {{ label }}">
             <span class="slot-meta">{{ label }}</span>
             <strong class="category-display">{% include "menus/components/category.html" with key=key label=category only %}</strong>
           </a>
@@ -32,7 +32,7 @@
         <button type="submit" name="category" value="{{ key }}" class="category-choice">{% include "menus/components/category.html" with key=key label=label only %}</button>
       {% endfor %}
     </div>
-    <a class="button" href="{% url 'weekly_template' %}" data-template-reload hidden>Actualitza la plantilla</a>
+    <a class="button" href="{{ request.get_full_path }}" data-template-reload hidden>Actualitza la plantilla</a>
   </form>
 </template>
 {% endblock %}

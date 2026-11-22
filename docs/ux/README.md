@@ -1,6 +1,6 @@
 # Family Menu V1 — visual design handoff
 
-**Status:** consolidated V1 visual reference. This package replaces both legacy Spanish mockup boards. Do not use the old mockups or their JSON state files for implementation. No family data is required to review this deliverable.
+**Status:** consolidated V1 visual reference. Use the [V2.2 product corrections](../specs/V2.1-V2.2.md) for current interaction behavior. This package replaces both legacy Spanish mockup boards. Do not use the old mockups or their JSON state files for implementation. No family data is required to review this deliverable.
 
 ## Contents
 

@@ -14,7 +14,7 @@ from menus.application.shopping import (
 from menus.domain.planning import monday
 from menus.infrastructure.django_planning import MadridClock
 from menus.infrastructure.django_shopping import DjangoShoppingRepository
-from menus.web.common import parse_week, unavailable
+from menus.web.common import command_done, parse_week, unavailable
 from menus.web.presentation import week_navigation
 
 
@@ -109,7 +109,7 @@ def shopping_action(request, week, action):
                 messages.info(request, "Aquest producte s’havia afegit, però ja no és a la llista.")
         elif result:
             messages.success(request, "Producte afegit a la llista.")
-        return redirect("shopping_week", week=week.isoformat())
+        return command_done(request, "shopping_week", week=week.isoformat())
     except PastWeek:
         return HttpResponse("Aquesta setmana és només de consulta.", status=403)
     except ShoppingConflict as conflict:
@@ -165,6 +165,13 @@ def shopping_form(request, week, action, item_id=None):
             row = next((candidate for candidate in rows if candidate["key"] == (key, family)), None)
             if action == "adjust" and (not row or family == "taste"):
                 raise Http404()
+        if action == "manual_remove":
+            if (request.GET.get("menu_version", str(menu.version)) != str(menu.version)
+                    or request.GET.get("overlay_version", str(state.version)) != str(state.version)):
+                return render(request, "menus/action_error.html", {"week": week}, status=409)
+            return render(request, "menus/manual_confirm.html", {
+                "week": week, "item": item, "menu_version": menu.version, "overlay_version": state.version,
+            })
         return render(request, "menus/shopping_form.html", {"week": week, "menu": menu, "state": state,
                       "action": action, "item": item, "row": row, "token": str(uuid4())})
     except (DatabaseError, ValueError, KeyError):

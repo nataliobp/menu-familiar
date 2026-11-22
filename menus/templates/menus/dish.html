@@ -7,9 +7,12 @@
   <a class="button" href="{% url 'dish_edit' dish.id %}">{% include "menus/components/icon.html" with name="edit" only %}Edita el plat</a>
   <a class="button" href="{% url 'recipe_edit' dish.id %}">{% include "menus/components/icon.html" with name="book" only %}Edita la recepta</a>
   {% if dish.archived %}
-    <a class="button" href="{% url 'dish_archive' dish.id 'restore' %}">{% include "menus/components/icon.html" with name="restore" only %}Restaura</a>
+    <form method="post" action="{% url 'dish_archive' dish.id 'restore' %}">
+      {% csrf_token %}<input type="hidden" name="version" value="{{ dish.version }}">
+      <button>{% include "menus/components/icon.html" with name="restore" only %}Restaura</button>
+    </form>
   {% else %}
-    <a class="button danger" href="{% url 'dish_archive' dish.id 'archive' %}">{% include "menus/components/icon.html" with name="archive" only %}Arxiva</a>
+    <a class="button danger" data-confirm href="{% url 'dish_archive' dish.id 'archive' %}?version={{ dish.version }}">{% include "menus/components/icon.html" with name="archive" only %}Arxiva</a>
   {% endif %}
 </div>
 <div class="metadata">

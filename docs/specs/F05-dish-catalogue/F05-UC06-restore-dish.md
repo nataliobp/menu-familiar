@@ -16,7 +16,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 
 ## Main scenario and postconditions
 
-1. Open archived detail, press `Restaura el plat`.
+1. Open archived detail, tap `Restaura` to submit immediately.
 2. Validate version, restore same ID/metadata/recipe; commit and redirect detail/active list.
 3. Recommendation ranking uses persisted historical occurrences of same ID.
 

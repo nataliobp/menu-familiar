@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from django.test import TestCase
-from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu, create_menu
+from menus.application.planning import PastWeek, PlanningConflict, Rollover, change_menu
+from menus.tests.planning_fixtures import create_legacy_menu
 from menus.infrastructure.django_planning import DjangoPlanningRepository
 from menus.models import DishRecord, TemplateSlotRecord, WeeklyMenuRecord
 
@@ -19,24 +20,14 @@ class PlanningTests(TestCase):
         self.clock = Clock(self.week)
         self.dish = DishRecord.objects.create(name="Plat", primary_category_id="cereals", meal_preference="both", special_occasion=False)
 
-    def test_create_copies_template_and_is_idempotent(self):
-        TemplateSlotRecord.objects.filter(day_index=0, meal="lunch").update(suggested_category_id="cereals")
-        menu = create_menu(self.repo, self.clock, self.week)
-        self.assertEqual(menu.slots[(0, "lunch")].suggestion, ("cereals", "Cereals"))
-        TemplateSlotRecord.objects.filter(day_index=0, meal="lunch").update(suggested_category_id="eggs")
-        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
-        again = create_menu(self.repo, self.clock, self.week)
-        self.assertEqual(again.version, 2)
-        self.assertEqual(again.slots[(0, "lunch")].suggestion, ("cereals", "Cereals"))
-
-    def test_guards_and_rollover_rollback(self):
+    def test_first_write_guards_and_rollover_rollback(self):
         with self.assertRaises(PastWeek):
-            create_menu(self.repo, self.clock, self.week - timedelta(days=7))
+            change_menu(self.repo, self.clock, self.week - timedelta(days=7), (0, "lunch"), 0, "skip")
         with self.assertRaises(Rollover):
-            create_menu(self.repo, Clock(self.week, self.week + timedelta(days=7)), self.week)
+            change_menu(self.repo, Clock(self.week, self.week + timedelta(days=7)), self.week,
+                        (0, "lunch"), 0, "assign", self.dish.pk)
         self.assertFalse(WeeklyMenuRecord.objects.exists())
-        create_menu(self.repo, self.clock, self.week)
-        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
+        change_menu(self.repo, self.clock, self.week, (0, "lunch"), 0, "assign", self.dish.pk)
         with self.assertRaises(PlanningConflict):
             change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "remove")
         self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "selected")
@@ -47,18 +38,19 @@ class PlanningTests(TestCase):
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             url = reverse("menu_week", args=[self.week.isoformat()])
             response = self.client.get(url)
-            self.assertContains(response, "Crea el menú")
+            self.assertNotContains(response, "Crea el menú")
+            self.assertContains(response, 'class="slot pending"', count=14)
             self.assertFalse(WeeklyMenuRecord.objects.exists())
-            self.assertEqual(self.client.post(reverse("menu_create", args=[self.week.isoformat()])).status_code, 302)
             picker = reverse("menu_picker", args=[self.week.isoformat(), 0, "lunch"])
             self.assertContains(self.client.get(picker), "Plat")
+            self.assertFalse(WeeklyMenuRecord.objects.exists())
             action = reverse("menu_action", args=[self.week.isoformat(), 0, "lunch", "assign"])
-            self.assertEqual(self.client.post(action, {"version": 1, "dish": self.dish.pk}).status_code, 302)
+            self.assertEqual(self.client.post(action, {"version": 0, "dish": self.dish.pk}).status_code, 302)
             self.assertContains(self.client.get(url), "Plat")
 
     def test_move_undo_and_invalidation_survive_reload(self):
         from menus.application.planning import move_or_undo
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         move_or_undo(self.repo, self.clock, self.week, 2, (0, "lunch"), (1, "dinner"))
         menu = self.repo.get(self.week)
@@ -74,13 +66,13 @@ class PlanningTests(TestCase):
         from unittest.mock import patch
         from django.urls import reverse
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
-            create_menu(self.repo, self.clock, self.week)
+            create_legacy_menu(self.repo, self.week)
             self.assertEqual(self.client.get(reverse("recipe_edit", args=[self.dish.pk])).status_code, 200)
             self.assertEqual(self.client.get(reverse("shopping_week", args=[self.week.isoformat()])).status_code, 200)
 
     def test_skipped_move_requires_confirmation_and_undo_restores_skip(self):
         from menus.application.planning import move_or_undo
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         change_menu(self.repo, self.clock, self.week, (1, "lunch"), 2, "skip")
         with self.assertRaises(ValueError):
@@ -92,7 +84,7 @@ class PlanningTests(TestCase):
         self.assertEqual(menu.slots[(1, "lunch")].state, "skipped")
 
     def test_direct_historical_write_refused(self):
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         with self.assertRaises(PastWeek):
             change_menu(self.repo, Clock(self.week + timedelta(days=7)), self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         self.assertEqual(self.repo.get(self.week).slots[(0, "lunch")].state, "pending")
@@ -100,7 +92,7 @@ class PlanningTests(TestCase):
     def test_remove_requires_confirmation_and_get_is_read_only(self):
         from unittest.mock import patch
         from django.urls import reverse
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         url = reverse("confirm_remove", args=[self.week.isoformat(), 0, "lunch"])
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
@@ -113,7 +105,7 @@ class PlanningTests(TestCase):
     def test_corrupt_snapshot_is_unavailable_not_silently_repaired(self):
         from django.urls import reverse
         from menus.models import MenuSlotRecord
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         record = MenuSlotRecord.objects.get(weekly_menu_id=self.week, day_index=0, meal="lunch")
         record.dish_snapshot["schema_version"] = 999
@@ -127,7 +119,7 @@ class PlanningTests(TestCase):
         from unittest.mock import patch
         from uuid import uuid4
         from django.urls import reverse
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         url = reverse("shopping_action", args=[self.week.isoformat(), "manual_add"])
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             response = self.client.post(url, {"menu_version": 1, "overlay_version": 0, "token": str(uuid4()), "name": "Producte sintètic", "quantity": "abc", "unit": "g"})
@@ -139,7 +131,7 @@ class PlanningTests(TestCase):
         from unittest.mock import patch
         from django.urls import reverse
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
-            create_menu(self.repo, self.clock, self.week)
+            create_legacy_menu(self.repo, self.week)
             change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
             response = self.client.post(reverse("recipe_publish", args=[self.dish.pk]), {"version": 1, "preparation": "Coeu-ho", "name": ["Arròs"], "quantity": ["160"], "unit": ["g"], "note": [""]})
             self.assertEqual(response.status_code, 302)
@@ -197,7 +189,7 @@ class PlanningTests(TestCase):
         from django.db.models.query import QuerySet
         from menus.application.planning import move_or_undo
         from menus.models import MenuSlotRecord
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         original = QuerySet.update
         writes = 0
@@ -233,7 +225,7 @@ class PlanningTests(TestCase):
         from unittest.mock import patch
         from django.urls import reverse
         from menus.models import MenuSlotRecord
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         row = MenuSlotRecord.objects.get(weekly_menu_id=self.week, day_index=0, meal="lunch")
         row.dish_snapshot["schema_version"] = 999
@@ -247,7 +239,7 @@ class PlanningTests(TestCase):
     def test_shopping_get_does_not_create_overlay_state(self):
         from django.urls import reverse
         from menus.models import ShoppingStateRecord
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         url = reverse("shopping_week", args=[self.week.isoformat()])
         self.assertEqual(self.client.get(url).status_code, 200)
         self.assertEqual(self.client.get(url).status_code, 200)
@@ -256,7 +248,7 @@ class PlanningTests(TestCase):
     def test_pending_slot_can_be_skipped_directly(self):
         from unittest.mock import patch
         from django.urls import reverse
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         url = reverse("confirm_skip", args=[self.week.isoformat(), 0, "lunch"])
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
             response = self.client.post(url, {"version": 1})
@@ -266,7 +258,7 @@ class PlanningTests(TestCase):
     def test_selected_skip_requires_explicit_confirmation(self):
         from unittest.mock import patch
         from django.urls import reverse
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         url = reverse("confirm_skip", args=[self.week.isoformat(), 0, "lunch"])
         with patch("menus.infrastructure.django_planning.MadridClock.today", side_effect=self.clock.today):
@@ -279,8 +271,8 @@ class PlanningTests(TestCase):
         from menus.application.planning import move_or_undo
         from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
         future = self.week + timedelta(days=14)
-        create_menu(self.repo, self.clock, self.week)
-        create_menu(self.repo, self.clock, future)
+        create_legacy_menu(self.repo, self.week)
+        create_legacy_menu(self.repo, future)
         change_menu(self.repo, self.clock, self.week, (6, "dinner"), 1, "assign", self.dish.pk)
         change_menu(self.repo, self.clock, future, (0, "lunch"), 1, "assign", self.dish.pk)
         self.assertEqual(DjangoCatalogueQueries().latest_dates()[self.dish.pk], future)
@@ -300,7 +292,7 @@ class PlanningTests(TestCase):
         from django.test import Client
         from django.urls import reverse
 
-        create_menu(self.repo, self.clock, self.week)
+        create_legacy_menu(self.repo, self.week)
         change_menu(self.repo, self.clock, self.week, (0, "lunch"), 1, "assign", self.dish.pk)
         change_menu(self.repo, self.clock, self.week, (1, "lunch"), 2, "skip")
         date_key = self.week.isoformat()

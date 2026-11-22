@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+<title id="title">Fregits</title>
+<path d="M9 30h38c0 17-10 24-22 24S9 46 9 30Z" fill="#86969f" stroke="#55636a" stroke-width="2.5"/>
+  <path d="M47 36h13" stroke="#55636a" stroke-width="6" stroke-linecap="round"/>
+  <path d="M14 29c2-5 9-8 16-8 9 0 13 4 15 8" fill="#f4d59c" stroke="#b97837" stroke-width="2"/>
+  <rect x="17" y="19" width="17" height="14" rx="7" transform="rotate(-20 25 26)" fill="#df9a47" stroke="#a76a2c" stroke-width="2"/>
+  <g fill="#f6d68c"><circle cx="23" cy="22" r="1.6"/><circle cx="28" cy="27" r="1.3"/><circle cx="19" cy="28" r="1.4"/></g>
+  <circle cx="38" cy="23" r="3" fill="#f8dd93"/>
+</svg>

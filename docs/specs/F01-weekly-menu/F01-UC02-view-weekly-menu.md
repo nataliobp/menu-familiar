@@ -1,4 +1,4 @@
-# F01-UC02 — View a persisted weekly menu
+# F01-UC02 — View a weekly menu
 
 - **Status:** V1 baseline
 - **Milestone:** M2; extend in M3
@@ -10,7 +10,7 @@ Open current weekly plan or revisit a saved one without side effects.
 
 ## Application and web contract
 
-`GetWeeklyMenu(week: date | None) -> WeeklyMenuView`; GET `/menu/` or `/menu/<week>/`. Missing week preview has existence=false, 14 positions, no version, no persisted slots. Existing DTO includes week, editable flag, version, state, names, suggestion, undo status.
+`GetWeeklyMenu(week: date | None) -> WeeklyMenuView`; GET `/menu/` or `/menu/<week>/`. A missing editable week has 14 interactive positions, version 0, and no persisted slots. Existing DTO includes week, editable flag, version, state, names, suggestion, undo status.
 
 Shared rules: [domain](../02-domain-model.md), [application ports](../03-application-contracts.md), [persistence](../04-persistence.md), [UX](../05-web-ux.md), [tests](../06-testing.md). Applicable security, editability, snapshot, transaction and version rules are mandatory. No images or login. All visible text Catalan.
 
@@ -18,7 +18,7 @@ Shared rules: [domain](../02-domain-model.md), [application ports](../03-applica
 
 1. Resolve default to current Monday; find persisted week or return preview.
 2. Render seven days and two distinct meals, states and selected dish snapshot; show read-only when past.
-3. Pending click opens picker after creation; selected detail opens exact snapshot; skipped opens reactivate action. Long text accessible in detail.
+3. Tapping an editable pending slot opens the picker and shows the live template hint before selection; selected detail opens exact snapshot; skipped opens reactivate action. Long text accessible in detail.
 
 ## Alternative and failure flows
 

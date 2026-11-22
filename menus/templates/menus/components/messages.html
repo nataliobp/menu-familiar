@@ -1,0 +1,1 @@
+{% for message in messages %}<p class="notice{% if message.tags == 'success' %} success{% endif %}" role="status">{{ message }}</p>{% endfor %}

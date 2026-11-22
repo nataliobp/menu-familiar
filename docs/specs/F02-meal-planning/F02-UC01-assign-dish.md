@@ -10,13 +10,13 @@ Choose an existing active dish to fill a pending meal.
 
 ## Application and web contract
 
-`AssignDish(week, position, dish_id, expected_version)` -> updated menu; POST slot `/assign/`. Slot pending; week exists/editable; active compatible identity, no meal/category restriction.
+`AssignDish(week, position, dish_id, expected_version)` -> updated menu; POST slot `/assign/`. Slot pending; week editable; dish active, with any category or meal preference. Version 0 starts a missing week atomically.
 
 Shared rules: [domain](../02-domain-model.md), [application ports](../03-application-contracts.md), [persistence](../04-persistence.md), [UX](../05-web-ux.md), [tests](../06-testing.md). Applicable security, editability, snapshot, transaction and version rules are mandatory. No images or login. All visible text Catalan.
 
 ## Main scenario and postconditions
 
-1. Open pending slot, show the suggested category when set and allow browsing all candidates; choose dish and submit version.
+1. Open pending slot, show the suggested category when set and allow browsing all candidates; tap a dish to submit the selection and version.
 2. Inside transaction check week/editability/version and pending state; load active dish, create snapshot, call aggregate assign, clear prior undo if changed.
 3. Save; PRG displays selected name immediately. Reconcile shopping if available M7.
 

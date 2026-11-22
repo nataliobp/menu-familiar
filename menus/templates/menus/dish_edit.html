@@ -32,7 +32,7 @@
 <p>Categoria principal actual: {{ dish.primary_category.name_ca|category_display:dish.primary_category.key }}</p>
 <p>Categories secundàries actuals: {% for key, label in categories %}{% if key in dish.secondary_categories %}{{ label }} {% endif %}{% endfor %}</p>
 <p>Preferència actual: {% if dish.meal_preference == "lunch" %}Dinar{% elif dish.meal_preference == "dinner" %}Sopar{% else %}Tots dos{% endif %}{% if dish.special_occasion %} · Ocasió especial{% endif %}</p>{% endif %}{% endif %}
-<form class="edit-form" method="post">{% csrf_token %}
+<form class="edit-form" data-discard-form{% if request.method == "POST" %} data-unsaved{% endif %} method="post">{% csrf_token %}
 <input type="hidden" name="version" value="{{ values.version }}">
 <input type="hidden" name="token" value="{{ values.token }}"><label for="name">Nom</label>
 <input id="name" {% if field_errors.name %}aria-invalid="true" aria-describedby="name-error"{% endif %} name="name" value="{{ values.name }}" maxlength="200" required><label for="primary">Categoria principal</label><select id="primary" {% if field_errors.primary %}aria-invalid="true" aria-describedby="primary-error"{% endif %} name="primary">{% for key, label in categories %}<option value="{{ key }}" {% if values.primary == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
@@ -46,8 +46,10 @@
 {% if conflict %}
 <button name="action" value="review">Revisa el valor actual</button>{% else %}
 <button class="primary">{% if new_creation %}Crea un plat nou{% else %}Desa{% endif %}</button>{% endif %}
-<a class="button" href="{% if dish %}{% url 'dish_detail' dish.id %}{% else %}{% url 'catalogue' %}{% endif %}">Cancel·la</a>
+{% if dish %}{% url 'dish_detail' dish.id as discard_url %}{% else %}{% url 'catalogue' as discard_url %}{% endif %}
+<a class="button" data-confirm-template="discard-edits" href="{{ discard_url }}">Cancel·la</a>
 </div>
 </form>
+{% include "menus/components/discard_changes.html" with destination=discard_url only %}
 {% endif %}
 {% endblock %}

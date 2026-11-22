@@ -17,45 +17,31 @@ class DuplicateWeek(Exception):
     pass
 
 
-def create_menu(repo, clock, week):
-    if week.weekday() != 0:
-        raise ValueError("Invalid week")
-    try:
-        with repo.atomic():
-            current = monday(clock.today())
-            if week < current:
-                raise PastWeek()
-            menu = repo.get(week)
-            if menu is None:
-                template, categories = repo.template()
-                menu = WeeklyMenu.from_template(week, template, categories)
-                repo.create(menu)
-            if monday(clock.today()) != current:
-                raise Rollover()
-            return menu
-    except DuplicateWeek:
-        with repo.atomic():
-            current = monday(clock.today())
-            if week < current:
-                raise PastWeek()
-            menu = repo.get(week)
-            if menu is None:
-                raise Rollover()
-            if monday(clock.today()) != current:
-                raise Rollover()
-            return menu
-
-
 def change_menu(repo, clock, week, position, version, operation, dish_id=None, confirmed=False):
+    try:
+        return _change_menu(repo, clock, week, position, version, operation, dish_id, confirmed)
+    except DuplicateWeek as exc:
+        raise PlanningConflict() from exc
+
+
+def _change_menu(repo, clock, week, position, version, operation, dish_id, confirmed):
     with repo.atomic():
         current = monday(clock.today())
         if week < current:
             raise PastWeek()
-        menu = repo.get(week)
-        if menu is None:
-            raise ValueError("Missing menu")
-        if menu.version != version:
-            raise PlanningConflict()
+        if version == 0 and operation in ("assign", "skip"):
+            menu = WeeklyMenu.empty(week)
+            # Reserve the unique week before reading any rows. SQLite can then
+            # serialize concurrent first writes without upgrading a read lock.
+            # Invalid transitions and snapshot failures roll back the reservation.
+            repo.create(menu)
+            version = menu.version
+        else:
+            menu = repo.get(week)
+            if menu is None:
+                raise ValueError("Missing menu")
+            if menu.version != version:
+                raise PlanningConflict()
         if operation in ("assign", "replace"):
             dish = repo.dish_snapshot(dish_id)
             if dish is None:
@@ -108,3 +94,14 @@ def move_or_undo(repo, clock, week, version, source=None, destination=None, conf
 
 def get_menu(repo, week):
     return repo.get(week)
+
+
+def read_plan(repo, week, editable):
+    menu = get_menu(repo, week)
+    if not editable:
+        return menu, None, {}, {}
+    template, categories = repo.template()
+    # Stored suggestions are legacy copies. The domain has never supported
+    # explicit per-slot overrides, so only the current template guides editing.
+    suggestions = {position: (key, categories[key]) for position, key in template.slots.items() if key}
+    return menu or WeeklyMenu.empty(week), menu.version if menu else 0, suggestions, categories

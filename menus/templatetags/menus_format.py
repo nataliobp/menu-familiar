@@ -1,6 +1,6 @@
 from django import template
 
-from menus.web.presentation import category_label
+from menus.web.presentation import category_art, category_label
 
 register = template.Library()
 
@@ -22,7 +22,7 @@ def weekday_short_ca(index):
 
 @register.filter
 def category_icon(key):
-    return key or "free"
+    return category_art(key)
 
 @register.filter
 def category_display(name, key):

@@ -6,7 +6,6 @@ urlpatterns = [
     path("", planning.current_menu),
     path("menu/", planning.current_menu, name="current_menu"),
     path("menu/<str:week>/", planning.menu_view, name="menu_week"),
-    path("menu/<str:week>/create/", planning.menu_create, name="menu_create"),
     path("menu/<str:week>/<str:action>/", planning.move_action, name="move_action"),
     path("menu/<str:week>/slots/<int:day>/<str:meal>/move/", planning.move_choice, name="move_choice"),
     path("menu/<str:week>/slots/<int:day>/<str:meal>/triar/", planning.menu_picker, name="menu_picker"),

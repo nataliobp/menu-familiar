@@ -1,1 +1,1 @@
-{% load menus_format %}<span class="category-icon">{% include "menus/components/icon.html" with name=key|category_icon only %}</span><span class="category-label">{{ label|category_display:key }}</span>
+{% load menus_format static %}{% static key|category_icon as category_src %}<img class="category-icon" src="{{ category_src }}" alt="" width="24" height="24"><span class="category-label">{{ label|category_display:key }}</span>
