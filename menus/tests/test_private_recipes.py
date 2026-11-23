@@ -229,6 +229,28 @@ class ImportTests(TestCase):
         self.assertEqual(self.apply([proposal], {7: expected})[0].recipe, "imported")
         self.assertTrue(CatalogueSourceRecord.objects.get(pk=7).rename_applied)
 
+    def test_release_mode_preserves_names_and_uses_verified_identity(self):
+        linked = self.dish(101, "Nom de casa", source_id=7)
+        legacy = self.dish(17, "Plat original")
+        self.dish(2, "Plat amb identitat incerta")
+        seed = {
+            key: CatalogueDish(key, "Plat original", "Amanides", frozenset(), "both", False)
+            for key in (2, 17)
+        }
+        proposals = [Proposal(key, "Plat original", "Nom aprovat", self.content) for key in (2, 7, 17)]
+        options = dict(store_photo=lambda _: None, preserve_dish_names=True)
+        preview = import_proposals(self.repo, self.clock, proposals, seed, {}, True, **options)
+        self.assertFalse(RecipeRecord.objects.exists())
+        self.assertEqual(preview, import_proposals(self.repo, self.clock, proposals, seed, {}, False, **options))
+        self.assertEqual([(row.recipe, row.rename) for row in preview], [
+            ("name_conflict", "blocked"), ("imported", "preserved_name"), ("imported", "preserved_name"),
+        ])
+        self.assertEqual(set(RecipeRecord.objects.values_list("dish_id", flat=True)), {linked.pk, legacy.pk})
+        self.assertEqual(set(DishRecord.objects.values_list("name", flat=True)), {
+            "Nom de casa", "Plat original", "Plat amb identitat incerta",
+        })
+        self.assertFalse(CatalogueSourceRecord.objects.get(pk=17).rename_applied)
+
     def test_command_is_read_only_by_default_and_rejects_invalid_input_before_change(self):
         self.dish(110, "Plat de prova 1", source_id=1)
         with TemporaryDirectory() as directory:
@@ -329,6 +351,29 @@ class ErrorLocaleTests(SimpleTestCase):
 
 
 class BackupTests(SimpleTestCase):
+    def test_backup_accepts_v1_without_photo_table_and_restores_wal_commit(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "original.sqlite3"
+            with sqlite3.connect(database) as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.execute("CREATE TABLE django_migrations (id, app, name)")
+                connection.execute("INSERT INTO django_migrations VALUES (?, ?, ?)", (
+                    1, "menus", "0010_alter_generatedoverlayrecord_ingredient_key_and_more",
+                ))
+                connection.commit()
+                backup = root / "backup"
+                self.assertEqual(backup_menu_data(database, root / "recipe-photos", backup), 0)
+                with sqlite3.connect(backup / "menu.sqlite3") as restored:
+                    self.assertEqual(restored.execute("SELECT * FROM django_migrations").fetchall(),
+                                     connection.execute("SELECT * FROM django_migrations").fetchall())
+                restored.close()
+                connection.execute("INSERT INTO django_migrations VALUES (2, 'menus', '0011_catalogue_source')")
+                connection.commit()
+                with self.assertRaises(ValueError):
+                    backup_menu_data(database, root / "recipe-photos", root / "bad")
+            connection.close()
+
     def test_backup_and_restore_keep_only_verified_referenced_photos(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

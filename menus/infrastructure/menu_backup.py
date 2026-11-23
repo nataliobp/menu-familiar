@@ -21,9 +21,24 @@ def backup_menu_data(database, photo_root, destination):
         with (closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True)) as live,
               closing(sqlite3.connect(snapshot)) as backup):
             live.backup(backup)
-            if backup.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+            if (backup.execute("PRAGMA integrity_check").fetchall() != [("ok",)]
+                    or backup.execute("PRAGMA foreign_key_check").fetchone() is not None):
                 raise ValueError("Backup integrity check failed")
-            references = backup.execute("SELECT source_id, photo_digest FROM menus_cataloguesourcerecord WHERE photo_digest != ''").fetchall()
+            has_photo_table = backup.execute(
+                "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'menus_cataloguesourcerecord'"
+            ).fetchone()
+            if has_photo_table:
+                references = backup.execute(
+                    "SELECT source_id, photo_digest FROM menus_cataloguesourcerecord WHERE photo_digest != ''"
+                ).fetchall()
+            else:
+                # V1 has recipes but the photo reference table first appears in 0011.
+                latest = backup.execute(
+                    "SELECT name FROM django_migrations WHERE app = 'menus' ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if latest != ("0010_alter_generatedoverlayrecord_ingredient_key_and_more",):
+                    raise ValueError("Missing photo reference table on an unsupported schema")
+                references = []
         snapshot.chmod(0o600)
         target = PhotoStore(staged / "recipe-photos")
         for source_id, digest in references:

@@ -23,6 +23,8 @@ class Command(BaseCommand):
         parser.add_argument("--legacy-catalogue", type=Path)
         parser.add_argument("--apply", action="store_true")
         parser.add_argument("--dry-run", action="store_true")
+        parser.add_argument("--preserve-dish-names", action="store_true",
+                            help="Import by verified source identity and keep all existing dish names.")
 
     def handle(self, *args, **options):
         root = options["bundle"]
@@ -40,7 +42,8 @@ class Command(BaseCommand):
             repo = DjangoPrivateRecipeRepository()
             results = import_proposals(repo, MadridClock(), proposals, legacy,
                                        {key: photo.digest for key, photo in photos.items()}, not apply,
-                                       store_photo=lambda key: store.store(key, photos[key]))
+                                       store_photo=lambda key: store.store(key, photos[key]),
+                                       preserve_dish_names=options["preserve_dish_names"])
         except (InvalidBundle, InvalidCatalogue) as exc:
             raise CommandError(str(exc)) from None
         except (OSError, DatabaseError, DataIntegrityError, DishConflict, PlanningConflict, Rollover, ValueError):

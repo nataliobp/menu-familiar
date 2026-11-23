@@ -38,7 +38,8 @@ class ImportOutcome:
     photo: str = "pending"
 
 
-def import_proposals(repo, clock, proposals, legacy_catalogue, photos, dry_run, store_photo):
+def import_proposals(repo, clock, proposals, legacy_catalogue, photos, dry_run, store_photo, *,
+                     preserve_dish_names=False):
     outcomes = []
     with repo.atomic():
         current_week = monday(clock.today())
@@ -51,10 +52,10 @@ def import_proposals(repo, clock, proposals, legacy_catalogue, photos, dry_run, 
             dish_id, dish, version = target.dish_id, target.dish, target.version
             renamed = target.rename_applied
             expected = proposal.approved_name if renamed else proposal.original_name
-            if dish.name != expected:
+            if not preserve_dish_names and dish.name != expected:
                 outcomes.append(ImportOutcome(source_id, "name_conflict", "blocked", "blocked"))
                 continue
-            rename = not renamed and proposal.approved_name != proposal.original_name
+            rename = not preserve_dish_names and not renamed and proposal.approved_name != proposal.original_name
             if rename and target.catalogue_edited:
                 outcomes.append(ImportOutcome(source_id, "identity_conflict", "blocked", "blocked"))
                 continue
@@ -86,7 +87,12 @@ def import_proposals(repo, clock, proposals, legacy_catalogue, photos, dry_run, 
                     store_photo(source_id)
                     if photo == "linked":
                         repo.link_photo(source_id, dish_id, version, photos[source_id])
-            outcomes.append(ImportOutcome(source_id, recipe, "renamed" if rename else "none", photo))
+            name_outcome = "none"
+            if rename:
+                name_outcome = "renamed"
+            elif preserve_dish_names and dish.name != proposal.approved_name:
+                name_outcome = "preserved_name"
+            outcomes.append(ImportOutcome(source_id, recipe, name_outcome, photo))
         if not dry_run and monday(clock.today()) != current_week:
             raise Rollover()
     return outcomes

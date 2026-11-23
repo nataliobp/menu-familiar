@@ -2,6 +2,8 @@
 
 Django application for household meal planning. The authoritative contracts are [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs](docs/specs/README.md) and [docs/ux](docs/ux/README.md). The [V2.5 contract](docs/specs/V2.5-SHOPPING-REMINDER.md) describes the read-only `Llista de la compra` tab. Record consolidated owner QA and verify household network isolation before releasing the service.
 
+For an existing V1 installation, follow the [V2.0.0 production upgrade runbook](docs/V2.0.0-RELEASE.md) for the guarded data merge, rehearsal and rollback.
+
 ## Disposable development setup
 
 Use a supported Python version (target 3.12), an isolated virtual environment and a fresh absolute database path. Django does not automatically load `.env`.

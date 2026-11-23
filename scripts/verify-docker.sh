@@ -23,6 +23,10 @@ app=''
 audit_container=''
 volume=''
 docker_cmd() {
+    if [ "${MENU_DOCKER_DIRECT:-0}" = 1 ]; then
+        docker "$@"
+        return
+    fi
     sudo docker "$@"
 }
 
@@ -55,8 +59,8 @@ trap 'exit 143' TERM
 
 ref=$(git rev-parse --verify HEAD)
 printf 'Commit: %s\n' "$ref"
-printf '\n== Docker access (sudo) ==\n'
-if ! sudo -v >&3 2>&4; then
+printf '\n== Docker access ==\n'
+if [ "${MENU_DOCKER_DIRECT:-0}" != 1 ] && ! sudo -v >&3 2>&4; then
     printf 'Could not authenticate with sudo. Run this script from your terminal as an authorized user.\n'
     exit 1
 fi
