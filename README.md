@@ -4,6 +4,8 @@ Django application for household meal planning. The authoritative contracts are 
 
 For an existing V1 installation, follow the [V2.0.0 production upgrade runbook](docs/V2.0.0-RELEASE.md) for the guarded data merge, rehearsal and rollback.
 
+For V2.0.1, follow the [PWA and Tailscale deployment runbook](docs/V2.0.1-RELEASE.md) to retain LAN access and add a separate tailnet-only HTTPS endpoint.
+
 ## Disposable development setup
 
 Use a supported Python version (target 3.12), an isolated virtual environment and a fresh absolute database path. Django does not automatically load `.env`.

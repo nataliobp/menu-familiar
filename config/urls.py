@@ -1,8 +1,9 @@
 from django.urls import path
-from menus.web import catalogue, operations, photos, planning, recipes, shopping, template
+from menus.web import catalogue, operations, photos, planning, pwa, recipes, shopping, template
 
 urlpatterns = [
     path("healthz", operations.healthz, name="healthz"),
+    path("manifest.webmanifest", pwa.manifest, name="web_app_manifest"),
     path("", planning.current_menu),
     path("menu/", planning.current_menu, name="current_menu"),
     path("menu/<str:week>/", planning.menu_view, name="menu_week"),

@@ -4,7 +4,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#286044">
   <title>{% block title %}Menú Familiar{% endblock %}</title>
+  <link rel="manifest" href="{% url 'web_app_manifest' %}">
+  <link rel="apple-touch-icon" href="{% static 'menus/pwa/icon-192.png' %}">
   <link rel="stylesheet" href="{% static 'menus/app.css' %}">
   <script src="{% static 'menus/app.js' %}" defer></script>
 </head>

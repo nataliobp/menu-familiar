@@ -21,6 +21,20 @@ class SettingsTests(TestCase):
         self.assertNotEqual(self.run_settings(DJANGO_ENV="development").returncode, 0)
         self.assertEqual(self.run_settings(DJANGO_ENV="development", DJANGO_DB_PATH="/tmp/disposable.sqlite3").returncode, 0)
 
+    def test_proxy_settings_require_an_exact_allowed_host_and_peer_ip(self):
+        environment = {
+            "DJANGO_SECRET_KEY": "test", "DJANGO_DB_PATH": "/tmp/disposable.sqlite3",
+            "DJANGO_ALLOWED_HOSTS": "192.168.1.22,homeserver.tail02b38e.ts.net",
+            "DJANGO_TAILSCALE_HOST": "homeserver.tail02b38e.ts.net", "DJANGO_TAILSCALE_PROXY_IP": "172.24.0.1",
+        }
+        self.assertEqual(self.run_settings(**environment).returncode, 0)
+        for invalid in (
+            {"DJANGO_TAILSCALE_PROXY_IP": ""}, {"DJANGO_TAILSCALE_PROXY_IP": "172.24.0.0/16"},
+            {"DJANGO_ALLOWED_HOSTS": "192.168.1.22"}, {"DJANGO_TAILSCALE_HOST": "https://homeserver.tail02b38e.ts.net"},
+        ):
+            with self.subTest(invalid=invalid):
+                self.assertNotEqual(self.run_settings(**(environment | invalid)).returncode, 0)
+
     def test_release_runbook_starts_service_only_after_successful_migration(self):
         root = Path(__file__).resolve().parents[2]
         release = (root / "README.md").read_text(encoding="utf-8").split("## Updates", 1)[1]

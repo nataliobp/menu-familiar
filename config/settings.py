@@ -1,5 +1,7 @@
+from ipaddress import IPv4Address
 from pathlib import Path
 import os
+import re
 import tempfile
 
 from django.core.exceptions import ImproperlyConfigured
@@ -19,6 +21,17 @@ if not ALLOWED_HOSTS:
         raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS is required")
     ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
 
+TAILSCALE_HOST = os.environ.get("DJANGO_TAILSCALE_HOST", "").strip().lower()
+TAILSCALE_PROXY_IP = os.environ.get("DJANGO_TAILSCALE_PROXY_IP", "").strip()
+if TAILSCALE_HOST or TAILSCALE_PROXY_IP:
+    if (not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net", TAILSCALE_HOST)
+            or TAILSCALE_HOST not in ALLOWED_HOSTS):
+        raise ImproperlyConfigured("Set DJANGO_TAILSCALE_HOST to the exact allowed tailnet hostname")
+    try:
+        TAILSCALE_PROXY_IP = str(IPv4Address(TAILSCALE_PROXY_IP))
+    except ValueError as exc:
+        raise ImproperlyConfigured("Set DJANGO_TAILSCALE_PROXY_IP to the exact Docker gateway IPv4 address") from exc
+
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -28,9 +41,11 @@ INSTALLED_APPS = [
     "menus",
 ]
 MIDDLEWARE = [
+    "menus.web.middleware.TailscaleProxyMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "menus.web.middleware.DataIntegrityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "menus.web.middleware.PrivateResponseMiddleware",
+    "menus.web.middleware.DataIntegrityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

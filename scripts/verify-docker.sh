@@ -104,12 +104,22 @@ MENU_PORT=18765
 MENU_IMAGE=$run_id:app
 EOF
 docker_cmd compose --env-file "$work/compose.env" --project-directory "$work" \
-    -f "$work/compose.yaml" -p "$run_id" config --quiet
+    -f "$work/compose.yaml" -p "$run_id" config --format json > "$work/compose.json"
 printf 'Compose configuration validated without loading project .env or starting services.\n'
 
 printf '\n== Build application image ==\n'
 docker_cmd build --tag "$run_id:app" "$context"
 tag="$run_id:app"
+docker_cmd run --rm -i --network none --entrypoint python "$tag" -c '
+import json
+import sys
+
+ports = json.load(sys.stdin)["services"]["menu-familiar"]["ports"]
+actual = {(port["host_ip"], str(port["published"]), port["target"], port["protocol"]) for port in ports}
+expected = {("127.0.0.1", "18765", 8000, "tcp"), ("127.0.0.1", "18768", 8001, "tcp")}
+assert actual == expected and len(ports) == len(expected), "Unexpected Compose port bindings"
+' < "$work/compose.json"
+printf 'Existing LAN listener and dedicated loopback backend mappings verified.\n'
 
 printf '\n== Verify Docker build-context exclusions ==\n'
 # The real build above uses only Git blobs. This separate build checks that
@@ -207,14 +217,16 @@ app=$(docker_cmd run --detach --name "$run_id-app" --network none \
         -e "DJANGO_DB_PATH=$DJANGO_DB_PATH" "$tag")
 if ! docker_cmd exec -i "$app" python - <<'PY'
 from time import monotonic, sleep
+from json import loads
+from struct import unpack
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
 # This probe runs inside the container and must always use its own loopback.
 opener = build_opener(ProxyHandler({}))
 
-def request(path, *, timeout=15, **kwargs):
-    req = Request("http://127.0.0.1:8000" + path, **kwargs)
+def request(path, *, timeout=15, port=8000, **kwargs):
+    req = Request(f"http://127.0.0.1:{port}" + path, **kwargs)
     try:
         with opener.open(req, timeout=timeout) as response:
             return response.status, response.read()
@@ -242,11 +254,21 @@ print(f"Gunicorn health check passed after {attempts} attempt(s).", flush=True)
 
 assert request("/menu/")[0] == 200, "Menu unavailable"
 assert request("/static/menus/app.css")[0] == 200, "Collected stylesheet unavailable"
+status, body = request("/manifest.webmanifest")
+assert status == 200, "PWA manifest unavailable"
+manifest = loads(body)
+assert (manifest["start_url"], manifest["scope"], manifest["display"]) == ("/menu/", "/", "standalone")
+assert {icon["sizes"] for icon in manifest["icons"]} == {"192x192", "512x512"}
+for icon in manifest["icons"]:
+    status, data = request(icon["src"])
+    assert status == 200 and data.startswith(b"\x89PNG\r\n\x1a\n"), "Collected icon unavailable"
+    assert "x".join(map(str, unpack(">II", data[16:24]))) == icon["sizes"], "Icon dimensions differ"
+assert request("/healthz", port=8001)[0] == 403, "Unconfigured proxy listener must deny requests"
 status, body = request("/plats/")
 assert status == 200 and "Plat sintètic Docker".encode() in body, "Seed not visible in the restored database"
 assert request("/menu/", headers={"Host": "invalid.example"})[0] == 400, "Host validation failed"
 assert request("/plantilla/0/lunch/", data=b"category=cereals")[0] == 403, "CSRF validation failed"
-print("Health, menu, persisted seed, static assets, Host validation and CSRF verified.")
+print("Health, menu, persisted seed, PWA assets, disabled proxy listener, Host validation and CSRF verified.")
 PY
 then
     docker_cmd logs "$app"
