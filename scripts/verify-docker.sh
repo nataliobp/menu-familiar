@@ -2,17 +2,31 @@
 # Verify the committed application in disposable Docker resources.
 set -eu
 umask 077
+result=''
+requested_ref=''
 case "${1:-}" in
     "") keep_image=false ;;
-    --keep-image) keep_image=true ;;
+    --keep-image) [ "$#" -eq 1 ]; keep_image=true ;;
+    --deployment-result)
+        [ "$#" -eq 3 ]
+        keep_image=false
+        result=$2
+        requested_ref=$3
+        ;;
     *) printf 'Usage: %s [--keep-image]\n' "$0" >&2; exit 2 ;;
 esac
 
-repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+if [ -n "${result:-}" ]; then
+    repo=$(git rev-parse --show-toplevel)
+else
+    repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+fi
 cd "$repo"
-mkdir -p logs
-log="$repo/logs/docker-verification.log"
-log_tmp=$(mktemp "$repo/logs/.docker-verification.XXXXXX")
+log_dir="$repo/logs"
+[ -z "${result:-}" ] || log_dir=$(dirname -- "$result")
+mkdir -p "$log_dir"
+log="$log_dir/docker-verification.log"
+log_tmp=$(mktemp "$log_dir/.docker-verification.XXXXXX")
 printf 'Docker verification output: %s\n' "$log"
 exec 3>&1 4>&2 >"$log_tmp" 2>&1
 
@@ -23,11 +37,13 @@ app=''
 audit_container=''
 volume=''
 docker_cmd() {
-    if [ "${MENU_DOCKER_DIRECT:-0}" = 1 ]; then
+    if [ -n "${result:-}" ]; then
+        sudo -n /usr/bin/docker --host unix:///var/run/docker.sock "$@"
+    elif [ "${MENU_DOCKER_DIRECT:-0}" = 1 ]; then
         docker "$@"
-        return
+    else
+        sudo docker "$@"
     fi
-    sudo docker "$@"
 }
 
 finish() {
@@ -58,9 +74,10 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 ref=$(git rev-parse --verify HEAD)
+[ "$ref" = "${requested_ref:-$ref}" ]
 printf 'Commit: %s\n' "$ref"
 printf '\n== Docker access ==\n'
-if [ "${MENU_DOCKER_DIRECT:-0}" != 1 ] && ! sudo -v >&3 2>&4; then
+if [ -z "${result:-}" ] && [ "${MENU_DOCKER_DIRECT:-0}" != 1 ] && ! sudo -v >&3 2>&4; then
     printf 'Could not authenticate with sudo. Run this script from your terminal as an authorized user.\n'
     exit 1
 fi
@@ -108,7 +125,7 @@ docker_cmd compose --env-file "$work/compose.env" --project-directory "$work" \
 printf 'Compose configuration validated without loading project .env or starting services.\n'
 
 printf '\n== Build application image ==\n'
-docker_cmd build --tag "$run_id:app" "$context"
+docker_cmd build --label "org.opencontainers.image.revision=$ref" --tag "$run_id:app" "$context"
 tag="$run_id:app"
 docker_cmd run --rm -i --network none --entrypoint python "$tag" -c '
 import json
@@ -280,4 +297,10 @@ if "$keep_image"; then
     docker_cmd image tag "$tag" "$candidate"
     printf 'Verified candidate: %s\n' "$candidate"
     docker_cmd image inspect --format '{{.Id}}' "$candidate"
+fi
+if [ -n "${result:-}" ]; then
+    image_id=$(docker_cmd image inspect --format '{{.Id}}' "$tag")
+    # Retain the verified image without replacing any existing release tag.
+    docker_cmd image tag "$image_id" "menu-familiar:verified-$ref-$run_id"
+    printf '%s\n' "$image_id" >"$result"
 fi

@@ -150,6 +150,8 @@ PYBACKUP
 
 ## Updates
 
+For routine updates to the existing Home Server installation, run `./deploy.sh` from a clean, committed branch. See the [local deployment runbook](docs/DEPLOYMENT.md) for owner setup, verification, backup and recovery. The manual procedure below covers changes that need explicit intervention.
+
 Fetch the approved release tag and verify it while the old container is still running.
 
 ```bash
