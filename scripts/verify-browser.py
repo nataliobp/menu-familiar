@@ -543,6 +543,62 @@ def verify_reminder(page, origin, week, mode):
     expect(page.get_by_text("80 g", exact=True)).to_be_visible()
     expect(page.get_by_text("375,125 ml", exact=True)).to_be_visible()
 
+
+def verify_mobile_navigation(browser, origin):
+    for standalone in (False, True):
+        context = browser.new_context(is_mobile=True, has_touch=True, java_script_enabled=False,
+                                      viewport={"width": 393, "height": 740})
+        page = context.new_page()
+        # Establish the mobile page scale before setting the viewport overrides.
+        page.goto(f"{origin}/menu/")
+        cdp = context.new_cdp_session(page)
+        if standalone:
+            # Headless Chromium has no installed Android window. Enable the real
+            # standalone CSS before first paint and model a stale dynamic height.
+            def activate_standalone_css(route):
+                response = route.fetch()
+                css = response.text().replace("@media (display-mode: standalone)", "@media all")
+                route.fulfill(response=response, body=css)
+
+            page.route("**/static/menus/app.css", activate_standalone_css)
+
+        for index, (width, height, difference, inset) in enumerate((
+            (393, 740, 48, 0),
+            (393, 776, 24, 16),
+            (776, 393, 24, 0),
+            (393, 740, 0, 0),
+        )):
+            difference = difference if standalone else 0
+            page.set_viewport_size({"width": width, "height": height})
+            cdp.send("Emulation.setSmallViewportHeightDifferenceOverride", {"difference": difference})
+            cdp.send("Emulation.setSafeAreaInsetsOverride", {"insets": {"bottom": inset}})
+            if index == 0:
+                page.reload()
+
+            navigation = page.get_by_role("navigation", name="Navegació principal")
+            assert navigation.get_by_role("link").count() == 4
+            bottom = height - difference
+            nav_box = navigation.bounding_box()
+            assert abs(nav_box["y"] + nav_box["height"] - bottom) <= 1, (
+                standalone, width, height, index, nav_box, bottom,
+            )
+            for link in navigation.get_by_role("link").all():
+                box = link.bounding_box()
+                assert 0 <= box["y"] and box["y"] + box["height"] <= bottom - inset
+            main = page.locator("main")
+            if index == 0:
+                assert main.evaluate("main => main.scrollTop") == 0
+                assert main.evaluate("main => main.scrollHeight > main.clientHeight")
+                main.evaluate("main => { main.scrollTop = main.scrollHeight; }")
+                assert main.evaluate("main => main.scrollTop") > 0
+                assert page.evaluate("window.scrollY") == 0
+                assert navigation.bounding_box() == nav_box
+
+        navigation.get_by_role("link", name="Plats").tap()
+        page.wait_for_url("**/plats/")
+        context.close()
+
+
 def main():
     with TemporaryDirectory(prefix="menu-browser-") as directory:
         os.environ.update(DJANGO_ENV="development", DJANGO_DEBUG="1",
@@ -593,6 +649,7 @@ def main():
                 raise server.error
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch()
+                verify_mobile_navigation(browser, f"http://127.0.0.1:{server.port}")
                 first = browser.new_context(java_script_enabled=False)
                 second = browser.new_context(java_script_enabled=False)
                 for context in (first, second):
@@ -625,7 +682,7 @@ def main():
                 browser.close()
         finally:
             server.terminate()
-    print("V1 and V2 browser checks passed with and without JavaScript.")
+    print("V1 and V2 browser checks passed, including mobile navigation in browser and simulated standalone modes.")
 
 
 if __name__ == "__main__":
