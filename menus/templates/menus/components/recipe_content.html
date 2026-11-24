@@ -1,4 +1,5 @@
 {% load menus_format %}
+{% if not is_preview %}
 {% if content.proposal %}
   <p class="hint">Recepta proposada{% if content.proposal.provenance == "user_adapted" %} a partir d’una preparació de casa{% endif %}, pendent de validar.{% if unpublished_changes %} Hi ha canvis sense publicar.{% endif %}</p>
 {% elif recipe_status == "published" %}
@@ -7,7 +8,7 @@
   <p class="notice">Recepta en esborrany</p>
 {% else %}
   <p class="notice">Recepta pendent</p>
-{% endif %}
+{% endif %}{% endif %}
 <div class="recipe-body">
 {% if photo_url %}
   <figure class="recipe-photo">

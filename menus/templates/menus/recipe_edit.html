@@ -1,6 +1,9 @@
 {% extends "menus/base.html" %}{% load menus_format %}{% block content %}
 <h1>{% if target_changed %}El contingut ha canviat{% else %}Edita la recepta{% if dish %} · {{ dish.name }}{% endif %}{% endif %}</h1>
 {% if not target_unavailable and not retry_read %}<p>La recepta compartida és per a 2 adults.</p>{% endif %}
+{% if request.method == "GET" and dish %}
+<a class="button" href="{% if week %}{% url 'slot_recipe_import' week|date:'Y-m-d' day meal %}{% else %}{% url 'recipe_import' dish.id %}{% endif %}">Importar recepta</a>
+{% endif %}
 {% if error %}
 <div role="alert" tabindex="-1" autofocus>
 

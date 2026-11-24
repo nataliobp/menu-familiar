@@ -72,6 +72,13 @@ def editor_content(dish_id, context, submitted_dish_id):
     return dish, (recipe.draft or recipe.published) if recipe else None
 
 
+def recipe_slot_context(week, day, meal):
+    week = parse_week(week)
+    if day not in range(7) or meal not in MEALS:
+        raise Http404()
+    return week, (day, meal)
+
+
 @require_http_methods(["GET", "POST"])
 def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None):
     submitted = request.method == "POST"
@@ -79,10 +86,8 @@ def recipe_editor(request, dish_id, week=None, day=None, meal=None, intent=None)
         return HttpResponseNotAllowed(["POST"])
     context = None
     if week is not None:
-        week = parse_week(week)
-        if day not in range(7) or meal not in MEALS:
-            raise Http404()
-        context = (week, (day, meal))
+        context = recipe_slot_context(week, day, meal)
+        week = context[0]
     submitted_dish_id = request.POST.get("dish_id", "") if submitted else None
     values = posted_recipe(request) if submitted else None
     fields = {"week": week, "day": day, "meal": meal, "values": values,

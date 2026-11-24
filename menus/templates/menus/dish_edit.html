@@ -5,6 +5,7 @@
   {% for field, detail in field_errors.items %}
 <p><a href="#{{ field }}">{{ detail }}</a></p>{% endfor %}
 </div>{% endif %}
+{% if request.method == "GET" and not dish %}<a class="button" href="{% url 'new_recipe_import' %}">Importar recepta</a>{% endif %}
 {% if target_unavailable %}
 <p>Nom enviat: {{ values.name }}</p>
 <a class="button" href="{% url 'catalogue' %}">Torna al catàleg de plats</a>

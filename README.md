@@ -6,6 +6,12 @@ For an existing V1 installation, follow the [V2.0.0 production upgrade runbook](
 
 For V2.0.1, follow the [PWA and Tailscale deployment runbook](docs/V2.0.1-RELEASE.md) to retain LAN access and add a separate tailnet-only HTTPS endpoint.
 
+## Structured recipe import
+
+Open **Importar recepta** from the new-dish form or an existing recipe editor. Copy the generated prompt to ChatGPT, then paste the returned JSON into Menú Familiar and preview it. The prompt includes the JSON schema and a complete example. The application processes the pasted text locally.
+
+Saving creates a draft and opens the manual recipe editor for further edits or publication. For a new dish, import sets the meal preference to either meal and leaves the special-occasion flag off. For an existing dish, the preview uses its catalogue name and categories. Confirming an import replaces its working draft, while any published recipe stays effective until publication.
+
 ## Disposable development setup
 
 Use a supported Python version (target 3.12), an isolated virtual environment and a fresh absolute database path. Django does not automatically load `.env`.

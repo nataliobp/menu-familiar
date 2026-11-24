@@ -1,6 +1,8 @@
 from django.db import models
 from django.db.models import Q
 
+from menus.domain.dish_edit import INITIAL_DISH_VERSION, MAX_DISH_NAME_LENGTH
+
 
 class CategoryRecord(models.Model):
     key = models.CharField(primary_key=True, max_length=32)
@@ -9,12 +11,12 @@ class CategoryRecord(models.Model):
 
 class DishRecord(models.Model):
     id = models.BigAutoField(primary_key=True)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=MAX_DISH_NAME_LENGTH)
     primary_category = models.ForeignKey(CategoryRecord, on_delete=models.PROTECT)
     meal_preference = models.CharField(max_length=6)
     special_occasion = models.BooleanField()
     archived = models.BooleanField(default=False)
-    version = models.PositiveBigIntegerField(default=1)
+    version = models.PositiveBigIntegerField(default=INITIAL_DISH_VERSION)
 
     class Meta:
         constraints = [

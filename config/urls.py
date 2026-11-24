@@ -1,5 +1,5 @@
 from django.urls import path
-from menus.web import catalogue, operations, photos, planning, pwa, recipes, shopping, template
+from menus.web import catalogue, operations, photos, planning, pwa, recipe_import, recipes, shopping, template
 
 urlpatterns = [
     path("healthz", operations.healthz, name="healthz"),
@@ -18,14 +18,17 @@ urlpatterns = [
     path("compra/<str:week>/", shopping.shopping_view, name="shopping_week"),
     path("plats/", catalogue.catalogue, name="catalogue"),
     path("plats/new/", catalogue.dish_edit, name="dish_create"),
+    path("plats/new/recepta/importar/", recipe_import.recipe_import, name="new_recipe_import"),
     path("plats/<int:dish_id>/", catalogue.dish_detail, name="dish_detail"),
     path("plats/<int:dish_id>/edit/", catalogue.dish_edit, name="dish_edit"),
     path("plats/<int:dish_id>/recepta/foto/", photos.recipe_photo, name="recipe_photo"),
     path("plats/<int:dish_id>/recepta/", recipes.recipe_view, name="recipe_view"),
     path("plats/<int:dish_id>/recepta/edit/", recipes.recipe_editor, name="recipe_edit"),
+    path("plats/<int:dish_id>/recepta/importar/", recipe_import.recipe_import, name="recipe_import"),
     path("plats/<int:dish_id>/recepta/draft/", recipes.recipe_editor, {"intent": "draft"}, name="recipe_draft"),
     path("plats/<int:dish_id>/recepta/publish/", recipes.recipe_editor, {"intent": "publish"}, name="recipe_publish"),
     path("menu/<str:week>/slots/<int:day>/<str:meal>/recepta/edit/", recipes.recipe_editor, {"dish_id": None}, name="slot_recipe_edit"),
+    path("menu/<str:week>/slots/<int:day>/<str:meal>/recepta/importar/", recipe_import.recipe_import, name="slot_recipe_import"),
     path("menu/<str:week>/slots/<int:day>/<str:meal>/recepta/draft/", recipes.recipe_editor, {"dish_id": None, "intent": "draft"}, name="slot_recipe_draft"),
     path("menu/<str:week>/slots/<int:day>/<str:meal>/recepta/publish/", recipes.recipe_editor, {"dish_id": None, "intent": "publish"}, name="slot_recipe_publish"),
     path("plats/<int:dish_id>/<str:action>/", catalogue.dish_archive, name="dish_archive"),

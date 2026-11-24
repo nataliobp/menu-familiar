@@ -399,3 +399,27 @@ window.addEventListener("pagehide", () => {
     confirmation?.close();
     sheet?.close();
 });
+
+const copyRecipePrompt = document.querySelector("[data-copy-recipe-prompt]");
+if (copyRecipePrompt) {
+    const prompt = document.getElementById("recipe-import-prompt");
+    const status = document.getElementById("recipe-import-copy-status");
+    copyRecipePrompt.hidden = false;
+    copyRecipePrompt.addEventListener("click", async () => {
+        let copied = false;
+        if (navigator.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(prompt.value);
+                copied = true;
+            } catch {
+                // Fall back to selecting the prompt on browsers without clipboard access.
+            }
+        }
+        if (!copied) {
+            prompt.focus();
+            prompt.select();
+            copied = document.execCommand?.("copy");
+        }
+        status.textContent = copied ? "Instrucció copiada." : "Copia el text seleccionat.";
+    });
+}

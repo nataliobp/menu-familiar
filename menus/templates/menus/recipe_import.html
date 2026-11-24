@@ -1,0 +1,41 @@
+{% extends "menus/base.html" %}
+{% block title %}Importar recepta · Menú Familiar{% endblock %}
+{% block content %}
+<h1>Importar recepta{% if dish %} · {{ dish.name }}{% endif %}</h1>
+{% if not target_unavailable %}
+<details class="edit-form"{% if request.method == "GET" %} open{% endif %}>
+  <summary>Instrucció per a ChatGPT</summary>
+  <p>Copia aquesta instrucció a ChatGPT i enganxa aquí el JSON que et retorni.</p>
+  <textarea id="recipe-import-prompt" class="recipe-import-prompt" aria-label="Instrucció per a ChatGPT" readonly>{{ prompt }}</textarea>
+  <button type="button" data-copy-recipe-prompt hidden>Copia la instrucció</button>
+  <span role="status" id="recipe-import-copy-status"></span>
+</details>
+{% endif %}
+<form class="edit-form" method="post">
+  {% csrf_token %}
+  {% if preview_token %}<input type="hidden" name="preview_token" value="{{ preview_token }}">{% endif %}
+  <label for="recipe-json">JSON de la recepta</label>
+  {% if error %}<p id="recipe-import-error" class="error" role="alert">{{ error }}</p>{% endif %}
+  <textarea id="recipe-json" class="recipe-import-json" name="recipe_json" spellcheck="false"{% if error %} aria-describedby="recipe-import-error"{% endif %}{% if target_unavailable %} readonly{% endif %}>
+{{ raw }}</textarea>
+  <div class="toolbar form-actions">
+    {% if not target_unavailable %}<button name="action" value="preview">Previsualitza la recepta</button>{% endif %}
+    <a class="button" href="{{ back_url }}">{% if target_unavailable %}Torna enrere{% else %}Cancel·la{% endif %}</a>
+  </div>
+
+  {% if preview_token %}
+  <section aria-labelledby="recipe-import-preview">
+    <h2 id="recipe-import-preview">Previsualització · {{ preview_name }}</h2>
+    <p><strong>Categoria principal</strong> · {{ primary_label }}</p>
+    {% if secondary_labels %}<p><strong>Categories secundàries</strong> · {{ secondary_labels|join:", " }}</p>{% endif %}
+    {% include "menus/components/recipe_content.html" with content=content is_preview=True only %}
+    <p>Després de desar l’esborrany, el podràs editar i publicar des de l’editor de receptes.</p>
+    {% if requires_confirmation %}
+      <p>Si ja hi ha una recepta publicada, continuarà vigent fins que publiquis l’esborrany.</p>
+      <label><input type="checkbox" name="confirm_replace" value="yes">Confirmo que vull substituir el contingut de treball de la recepta.</label>
+    {% endif %}
+    <button class="primary" name="action" value="save">Desa l’esborrany</button>
+  </section>
+  {% endif %}
+</form>
+{% endblock %}

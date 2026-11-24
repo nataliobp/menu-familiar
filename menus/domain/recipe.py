@@ -4,16 +4,18 @@ import unicodedata
 
 
 AMOUNT = re.compile(r"^[0-9]+(?:[.,][0-9]{1,3})?$")
+MAX_AMOUNT = Decimal("999999999.999")
 UNITS = {"g", "kg", "ml", "l", "unit"}
 MAX_PREPARATION_LENGTH = 10000
 MAX_INGREDIENTS = 100
+MAX_INGREDIENT_NOTE_LENGTH = 500
 
 
 def normalize_label(value):
     return unicodedata.normalize("NFC", " ".join(value.split()))
 
 
-def parse_amount(value, maximum=Decimal("999999999.999")):
+def parse_amount(value, maximum=MAX_AMOUNT):
     if not AMOUNT.fullmatch(value):
         raise ValueError("Invalid quantity")
     try:
@@ -35,7 +37,8 @@ def recipe_content(preparation, lines, publish=False):
         name = normalize_label(line.get("name", ""))
         unit, quantity = line.get("unit", ""), line.get("quantity", "").strip()
         note, taste = line.get("note", ""), line.get("taste", False)
-        if not name or not isinstance(note, str) or len(note) > 500 or unit not in UNITS | {""} or type(taste) is not bool:
+        if (not name or not isinstance(note, str) or len(note) > MAX_INGREDIENT_NOTE_LENGTH
+                or unit not in UNITS | {""} or type(taste) is not bool):
             raise ValueError("Invalid ingredient")
         if taste and (unit or quantity):
             raise ValueError("Invalid taste ingredient")

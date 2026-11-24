@@ -2,6 +2,10 @@ from dataclasses import dataclass
 from menus.domain.categories import CATEGORIES, pizza_membership_is_valid
 
 
+MAX_DISH_NAME_LENGTH = 200
+INITIAL_DISH_VERSION = 1
+
+
 @dataclass(frozen=True)
 class DishInput:
     name: str
@@ -13,7 +17,7 @@ class DishInput:
     def __post_init__(self):
         object.__setattr__(self, "name", self.name.strip())
         keys = {key for key, _ in CATEGORIES}
-        if (not self.name or len(self.name) > 200 or self.primary_category not in keys
+        if (not self.name or len(self.name) > MAX_DISH_NAME_LENGTH or self.primary_category not in keys
                 or not self.secondary_categories <= keys or self.primary_category in self.secondary_categories
                 or not pizza_membership_is_valid(self.primary_category, self.secondary_categories)
                 or self.meal_preference not in {"lunch", "dinner", "both"}
