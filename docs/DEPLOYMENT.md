@@ -10,7 +10,7 @@ Run `./deploy.sh` from the Menú Familiar checkout on the Home Server as the rep
 - Create a private, owner-controlled deployment directory. Allow disk space for an image archive and paired data snapshot per deployment, plus the Docker builds.
 
   ```sh
-  sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /var/lib/menu-familiar/deployments
+  install -d -m 0700 "$HOME/menu-familiar-deployments"
   ```
 
 Before the first production execution, run the [isolated Docker verifier](../README.md#isolated-docker-verification) on the committed checkout and confirm LAN and HTTPS work from the deployment host and trusted devices. Use a maintenance window and pause household edits through verification or recovery. Keep other operators and maintenance jobs from running `start.sh`, `stop.sh`, importing data, modifying `.env`, or pruning Docker images during deployment. The deployment lock serializes invocations of `deploy.sh`.

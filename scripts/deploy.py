@@ -16,7 +16,7 @@ from urllib.error import URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 REPO = Path(__file__).resolve().parents[1]
-STATE = Path("/var/lib/menu-familiar/deployments")
+STATE = Path.home() / "menu-familiar-deployments"
 DATA = "/var/lib/menu-familiar/data"
 SERVICE = "menu-familiar"
 LAN = "192.168.1.22"
