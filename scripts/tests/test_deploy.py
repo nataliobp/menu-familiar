@@ -1,6 +1,7 @@
 """Exercise cutover with an isolated Git remote, synthetic config and Docker doubles."""
 
 from contextlib import redirect_stdout
+from email.message import Message
 import fcntl
 import io
 import json
@@ -10,7 +11,10 @@ import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from urllib.parse import urlsplit
+from urllib.request import AbstractHTTPHandler
+from urllib.response import addinfourl
 
 from scripts import deploy
 
@@ -21,6 +25,145 @@ NEW = "2" * 64
 VERIFIER = deploy.REPO / "scripts/verify-docker.sh"
 SAFE_PLAN = [["menus", "0100_add_optional_field", True]]
 MANUAL_PLAN = [["menus", "0012_pizza_category", False]]
+LAN = f"http://{deploy.LAN}:18766"
+TAIL_HOST = "test.example.ts.net"
+HTTPS = f"https://{TAIL_HOST}:8443"
+WEEK = "2026-11-23"
+
+
+def http_response(url, status=200, body=b"", content_type="text/html", locations=()):
+    headers = Message()
+    headers["Content-Type"] = content_type
+    for location in locations:
+        headers["Location"] = location
+    return addinfourl(io.BytesIO(body), headers, url, status)
+
+
+def healthy_response(url):
+    path = urlsplit(url).path
+    if path == "/healthz":
+        return http_response(url, body=b"OK", content_type="text/plain")
+    if path in ("/menu/", "/compra/"):
+        return http_response(url, 302, locations=(f"{path}{WEEK}/",))
+    if path == "/static/menus/app.css":
+        return http_response(url, body=b"body {}", content_type="text/css")
+    if path in (f"/menu/{WEEK}/", "/plats/", f"/compra/{WEEK}/"):
+        return http_response(url, body=b"<!doctype html>")
+    raise AssertionError(f"Unexpected request to {url}")
+
+
+class SmokeTests(unittest.TestCase):
+    def setUp(self):
+        self.requests = []
+        self.responses = {}
+
+        def respond(handler, connection, request, **options):
+            url = request.full_url
+            self.requests.append(url)
+            if url in self.responses:
+                return http_response(url, **self.responses[url])
+            return healthy_response(url)
+
+        self.enterContext(patch.object(AbstractHTTPHandler, "do_open", respond))
+        self.report = Mock()
+
+    def smoke(self):
+        deploy.smoke(TAIL_HOST, self.report)
+
+    def test_expected_relative_and_absolute_redirects_on_both_origins(self):
+        self.responses[HTTPS + "/menu/"] = {"status": 302, "locations": (f"{HTTPS}/menu/{WEEK}/",)}
+        self.smoke()
+        paths = ("/healthz", "/menu/", f"/menu/{WEEK}/", "/plats/",
+                 "/compra/", f"/compra/{WEEK}/", "/static/menus/app.css")
+        self.assertEqual(self.requests, [origin + path for origin in (LAN, HTTPS) for path in paths])
+        self.assertEqual(self.report.call_count, 4)
+
+    def test_rejects_external_and_unexpected_redirects_before_requesting_them(self):
+        source = LAN + "/menu/"
+        weekly_path = f"/menu/{WEEK}/"
+        for locations in (
+            (f"https://other.example{weekly_path}",),
+            (f"//other.example{weekly_path}",),
+            (f"https://{deploy.LAN}:18766{weekly_path}",),
+            (f"http://{deploy.LAN}:80{weekly_path}",),
+            (f"http://name@{deploy.LAN}:18766{weekly_path}",),
+            (f"/compra/{WEEK}/",),
+            (f"{weekly_path}?next=/",),
+            ("/menu/2026-11-24/",),
+            ("/menu/2026-02-30/",),
+            ("http://[invalid",),
+            (),
+            (weekly_path, f"https://other.example{weekly_path}"),
+        ):
+            with self.subTest(locations=locations):
+                self.requests.clear()
+                self.responses[source] = {"status": 302, "locations": locations}
+                with self.assertRaises(deploy.DeploymentError) as error:
+                    self.smoke()
+                message = str(error.exception)
+                self.assertIn(f"{source}: HTTP 302", message)
+                self.assertIn("unexpected redirect", message)
+                for location in locations:
+                    self.assertIn(f"Location={location!r}", message)
+                self.assertEqual(self.requests, [LAN + "/healthz", source])
+
+    def test_loop_is_rejected_without_a_third_request(self):
+        target = LAN + f"/menu/{WEEK}/"
+        self.responses[target] = {"status": 302, "locations": ("/menu/",)}
+        with self.assertRaises(deploy.DeploymentError) as error:
+            self.smoke()
+        self.assertIn(f"{target}: HTTP 302 Location='/menu/'", str(error.exception))
+        self.assertEqual(self.requests, [LAN + "/healthz", LAN + "/menu/", target])
+
+    def test_rejects_4xx_and_5xx_from_redirect_target(self):
+        target_path = f"/menu/{WEEK}/"
+        target = LAN + target_path
+        for status in (404, 503):
+            with self.subTest(status=status):
+                self.responses[target] = {"status": status}
+                with self.assertRaises(deploy.DeploymentError) as error:
+                    self.smoke()
+                self.assertIn(f"{LAN}/menu/: HTTP 302 Location={target_path!r}", str(error.exception))
+                self.assertIn(f"{target}: HTTP {status}", str(error.exception))
+
+    def test_rejects_unhealthy_final_content(self):
+        target = LAN + f"/menu/{WEEK}/"
+        for response, detail in (
+            ({"body": b""}, "empty or blank body"),
+            ({"body": b" \t\n"}, "empty or blank body"),
+            ({"body": b"upstream error", "content_type": "text/plain"}, "expected text/html"),
+        ):
+            with self.subTest(response=response):
+                self.responses[target] = response
+                with self.assertRaises(deploy.DeploymentError) as error:
+                    self.smoke()
+                self.assertIn(f"{target}: HTTP 200: {detail}", str(error.exception))
+
+    def test_health_check_requires_direct_200_with_exact_body(self):
+        source = LAN + "/healthz"
+        for response, detail in (
+            ({"status": 302, "locations": (f"/menu/{WEEK}/",)}, "HTTP 302 Location="),
+            ({"status": 503}, "HTTP 503"),
+            ({"body": b"OK\n"}, "HTTP 200: expected body 'OK'"),
+        ):
+            with self.subTest(response=response):
+                self.requests.clear()
+                self.responses[source] = response
+                with patch.object(deploy, "monotonic", side_effect=(0, 45)):
+                    with self.assertRaises(deploy.DeploymentError) as error:
+                        self.smoke()
+                self.assertIn(f"{source}: {detail}", str(error.exception))
+                self.assertEqual(self.requests, [source])
+
+    def test_catalogue_and_stylesheet_reject_redirects(self):
+        for path in ("/plats/", "/static/menus/app.css"):
+            with self.subTest(path=path):
+                source = LAN + path
+                self.responses[source] = {"status": 302, "locations": (f"/menu/{WEEK}/",)}
+                with self.assertRaisesRegex(deploy.DeploymentError, "unexpected redirect") as error:
+                    self.smoke()
+                self.assertIn(f"{source}: HTTP 302", str(error.exception))
+                del self.responses[source]
 
 
 class Host(deploy.Deployment):
@@ -35,7 +178,7 @@ class Host(deploy.Deployment):
     def read_config(self, env_file):
         image = next(line.removeprefix("MENU_IMAGE=") for line in env_file.read_text().splitlines()
                      if line.startswith("MENU_IMAGE="))
-        return {"image": image, "environment": {"DJANGO_TAILSCALE_HOST": "test.example.ts.net"}}
+        return {"image": image, "environment": {"DJANGO_TAILSCALE_HOST": TAIL_HOST}}
 
     def inspect_runtime(self, container):
         return {"Image": self.image, "State": {"Running": self.running},
@@ -140,15 +283,19 @@ class CutoverTests(unittest.TestCase):
         self.host.image = OLD_IMAGE
         self.host.container = OLD
         self.host.calls = []
+        self.probes = []
 
-        def smoke(tail_host, report):
-            if self.host.failure == "health" and self.host.image == NEW_IMAGE:
-                raise deploy.DeploymentError("Synthetic HTTPS health failure")
-            if self.host.failure == "rollback-health":
-                raise deploy.DeploymentError("Synthetic health failure on both images")
-            report("health", "Synthetic health passed")
+        def respond(handler, connection, request, **options):
+            url = request.full_url
+            self.probes.append((self.host.image, url))
+            if url == f"{HTTPS}/menu/{WEEK}/" and (
+                self.host.failure == "rollback-health"
+                or self.host.failure == "health" and self.host.image == NEW_IMAGE
+            ):
+                return http_response(url, 503)
+            return healthy_response(url)
 
-        patch.object(deploy, "smoke", smoke).start()
+        self.enterContext(patch.object(AbstractHTTPHandler, "do_open", respond))
         self.log = io.StringIO()
 
     @staticmethod
@@ -178,6 +325,7 @@ class CutoverTests(unittest.TestCase):
     def test_success_pushes_exact_commit_after_cutover_and_keeps_backup(self):
         self.attempt()
         self.assertEqual(self.host.image, NEW_IMAGE)
+        self.assertIn((NEW_IMAGE, f"{HTTPS}/menu/{WEEK}/"), self.probes)
         self.assertEqual(self.pushed(), self.commit)
         self.assertIn(NEW_IMAGE, self.host.original_env.read_text())
         self.assertEqual((self.host.snapshot / "menu.sqlite3").read_text(), "synthetic original data")
@@ -257,14 +405,18 @@ class CutoverTests(unittest.TestCase):
         self.assertEqual(self.pushed(), "")
 
     def test_failed_health_rolls_back_code_only(self):
-        with self.assertRaisesRegex(deploy.DeploymentError, "HTTPS health"):
+        with self.assertRaisesRegex(deploy.DeploymentError, "HTTP 503"):
             self.attempt("health")
         self.assertEqual(self.host.image, OLD_IMAGE)
         self.assertTrue(self.host.running)
+        for image in (NEW_IMAGE, OLD_IMAGE):
+            for origin in (LAN, HTTPS):
+                self.assertIn((image, f"{origin}/menu/{WEEK}/"), self.probes)
+        self.assertIn((OLD_IMAGE, f"{HTTPS}/compra/{WEEK}/"), self.probes)
         self.assert_original()
 
     def test_failed_health_after_migration_requires_manual_recovery(self):
-        with self.assertRaisesRegex(deploy.DeploymentError, "HTTPS health"):
+        with self.assertRaisesRegex(deploy.DeploymentError, "HTTP 503"):
             self.attempt("health", SAFE_PLAN)
         self.assertEqual(self.host.image, NEW_IMAGE)
         self.assertFalse(self.host.running)
@@ -286,9 +438,10 @@ class CutoverTests(unittest.TestCase):
                 deploy.main([])
 
     def test_rollback_smoke_failure_keeps_recovery_marker(self):
-        with self.assertRaisesRegex(deploy.DeploymentError, "health failure"):
+        with self.assertRaisesRegex(deploy.DeploymentError, "HTTP 503"):
             self.attempt("rollback-health")
         self.assertEqual(self.host.image, OLD_IMAGE)
+        self.assertIn((OLD_IMAGE, f"{HTTPS}/menu/{WEEK}/"), self.probes)
         self.assertTrue(self.host.pending_file.exists())
 
     def test_remote_unavailable_reports_pending_while_keeping_deployed_image(self):

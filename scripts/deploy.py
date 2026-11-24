@@ -1,7 +1,8 @@
 """Owner-operated deployment of the existing Menú Familiar Compose service."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import fcntl
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -12,8 +13,8 @@ import subprocess
 import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory, mkdtemp
 from time import monotonic, sleep
-from urllib.error import URLError
-from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
+from urllib.parse import urljoin, urlsplit
+from urllib.request import HTTPErrorProcessor, ProxyHandler, build_opener
 
 REPO = Path(__file__).resolve().parents[1]
 STATE = Path.home() / "menu-familiar-deployments"
@@ -26,6 +27,8 @@ IMAGE_ID = re.compile(r"sha256:[a-f0-9]{64}")
 COMMIT = re.compile(r"[a-f0-9]{40,64}")
 TAIL_HOST = re.compile(r"[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net")
 APP_PATHS = ("/menu/", "/plats/", "/compra/", "/static/menus/app.css")
+WEEKLY_PATHS = ("/menu/", "/compra/")
+WEEK_PATH = re.compile(r"(/(?:menu|compra)/)([0-9]{4}-[0-9]{2}-[0-9]{2})/")
 SAFE_ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8"}
 
 
@@ -77,37 +80,76 @@ def command(label, args, *, env=None, cwd=REPO, output=None, log=None, stdin=Non
     return result.stdout.decode().strip() if result.stdout is not None else None
 
 
-class NoRedirects(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+class RawResponses(HTTPErrorProcessor):
+    def http_response(self, request, response):
+        # Inspect status and Location before urllib dispatches to redirect handlers.
+        return response
+
+    https_response = http_response
+
+
+def weekly_redirect(origin, path, location):
+    if not location or re.search(r"[\s\x00-\x1f\x7f\\?#]", location):
+        return None
+    try:
+        target = urlsplit(urljoin(origin + path, location))
+        match = WEEK_PATH.fullmatch(target.path)
+        if (f"{target.scheme}://{target.netloc.lower()}" == origin
+                and match and match[1] == path and date.fromisoformat(match[2]).weekday() == 0):
+            return origin + target.path
+    except ValueError:
         return None
 
 
 def smoke(tail_host, report):
-    opener = build_opener(ProxyHandler({}), NoRedirects())
+    opener = build_opener(ProxyHandler({}), RawResponses())
 
     def probe(origin, path, timeout):
-        with opener.open(origin + path, timeout=timeout) as response:
-            if response.status != 200:
-                return False
-            return (response.read(3) == b"OK" if path == "/healthz" else bool(response.read(1)))
+        url = origin + path
+        redirect = ""
+        for first_request in (True, False):
+            detail = redirect + url
+            try:
+                with opener.open(url, timeout=timeout) as response:
+                    detail += f": HTTP {response.status}"
+                    locations = response.headers.get_all("Location", [])
+                    for location in locations:
+                        detail += f" Location={location!r}"
+                    if response.status == 200:
+                        if path == "/healthz":
+                            require(response.read(3) == b"OK", f"{detail}: expected body 'OK'")
+                        else:
+                            expected_type = "text/css" if path.endswith(".css") else "text/html"
+                            require(response.headers.get_content_type() == expected_type,
+                                    f"{detail}: expected {expected_type}")
+                            require(response.read(512).strip(), f"{detail}: empty or blank body")
+                        return
+                    if first_request and response.status == 302 and path in WEEKLY_PATHS and len(locations) == 1:
+                        target = weekly_redirect(origin, path, locations[0])
+                        if target:
+                            redirect = f"{detail} -> "
+                            url = target
+                            continue
+                    if 300 <= response.status < 400:
+                        raise DeploymentError(f"{detail}: unexpected redirect")
+                    raise DeploymentError(f"{detail}: expected HTTP 200")
+            except (OSError, HTTPException) as error:
+                raise DeploymentError(f"{detail}: {error}") from None
 
     for name, origin in (("LAN", f"http://{LAN}:18766"), ("HTTPS", f"https://{tail_host}:8443")):
         deadline = monotonic() + 45
         while True:
             try:
-                if probe(origin, "/healthz", 4):
-                    break
-            except (OSError, URLError):
-                pass
-            require(monotonic() < deadline, f"{name} /healthz failed")
-            sleep(1)
+                probe(origin, "/healthz", 4)
+            except DeploymentError:
+                if monotonic() >= deadline:
+                    raise
+                sleep(1)
+            else:
+                break
         report("health", f"{name} /healthz passed")
         for path in APP_PATHS:
-            try:
-                healthy = probe(origin, path, 5)
-            except (OSError, URLError):
-                healthy = False
-            require(healthy, f"{name} smoke check failed for {path}")
+            probe(origin, path, 5)
         report("smoke", f"{name} menu, catalogue, shopping and stylesheet passed")
 
 
@@ -465,8 +507,9 @@ def main(args):
             deploy.report_recovery("failed", f"Failed during {deploy.stage} ({message})")
             try:
                 deploy.recover()
-            except (Exception, KeyboardInterrupt):
-                deploy.report_recovery("recovery_failed", f"Recovery needs owner attention. See {run}")
+            except (Exception, KeyboardInterrupt) as error:
+                message = str(error) if isinstance(error, DeploymentError) else type(error).__name__
+                deploy.report_recovery("recovery_failed", f"Recovery needs owner attention ({message}). See {run}")
             return 1
     return 0
 
