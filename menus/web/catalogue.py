@@ -11,6 +11,7 @@ from menus.application.dishes import (
 )
 from menus.application.errors import DataIntegrityError
 from menus.application.planning import Rollover
+from menus.domain.categories import pizza_membership_is_valid
 from menus.domain.dish_edit import DishInput
 from menus.infrastructure.django_catalogue_queries import DjangoCatalogueQueries
 from menus.infrastructure.django_dishes import DjangoDishRepository
@@ -137,7 +138,9 @@ def dish_edit(request, dish_id=None):
         if values["primary"] not in categories:
             field_errors["primary"] = "Tria una categoria principal."
         secondary = values["secondary"]
-        if set(secondary) - categories.keys() or len(set(secondary)) != len(secondary) or values["primary"] in secondary:
+        if not pizza_membership_is_valid(values["primary"], secondary):
+            field_errors["secondary"] = "La categoria Pizza només es pot triar com a categoria principal i no admet categories secundàries."
+        elif set(secondary) - categories.keys() or len(set(secondary)) != len(secondary) or values["primary"] in secondary:
             field_errors["secondary"] = "Tria categories secundàries diferents de la principal."
         if values["preference"] not in {"both", *MEALS}:
             field_errors["preference"] = "Tria un àpat preferent vàlid."

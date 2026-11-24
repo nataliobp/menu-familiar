@@ -37,8 +37,8 @@
 <input type="hidden" name="token" value="{{ values.token }}"><label for="name">Nom</label>
 <input id="name" {% if field_errors.name %}aria-invalid="true" aria-describedby="name-error"{% endif %} name="name" value="{{ values.name }}" maxlength="200" required><label for="primary">Categoria principal</label><select id="primary" {% if field_errors.primary %}aria-invalid="true" aria-describedby="primary-error"{% endif %} name="primary">{% for key, label in categories %}<option value="{{ key }}" {% if values.primary == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
 <fieldset id="secondary" tabindex="-1" {% if field_errors.secondary %}aria-describedby="secondary-error"{% endif %}>
-<legend>Categories secundàries</legend>{% for key, label in categories %}<label>
-<input type="checkbox" name="secondary" value="{{ key }}" {% if key in values.secondary %}checked{% endif %}>{{ label }}</label>{% endfor %}
+<legend>Categories secundàries</legend>{% for key, label in categories %}{% if key != "pizza" %}<label>
+<input type="checkbox" name="secondary" value="{{ key }}" {% if key in values.secondary %}checked{% endif %}>{{ label }}</label>{% endif %}{% endfor %}
 </fieldset><label for="preference">Àpat preferent</label><select id="preference" {% if field_errors.preference %}aria-invalid="true" aria-describedby="preference-error"{% endif %} name="preference"><option value="both" {% if values.preference == 'both' %}selected{% endif %}>Tots dos</option><option value="lunch" {% if values.preference == 'lunch' %}selected{% endif %}>Dinar</option><option value="dinner" {% if values.preference == 'dinner' %}selected{% endif %}>Sopar</option></select><label>
 <input type="checkbox" name="special" {% if values.special %}checked{% endif %}>Ocasió especial</label>{% for field, detail in field_errors.items %}
 <p id="{{ field }}-error">{{ detail }}</p>{% endfor %}

@@ -1,6 +1,8 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 from uuid import uuid4
 from django.test import TestCase
+from django.urls import reverse
 from menus.application.dishes import DishConflict, create_dish, update_dish
 from menus.application.planning import change_menu
 from menus.tests.planning_fixtures import create_legacy_menu
@@ -45,6 +47,53 @@ class DishTests(TestCase):
         update_dish(dishes, Clock(week + timedelta(days=7)), dish_id, DishInput("Nou", "eggs", frozenset(), "both", False), 1)
         self.assertEqual(plans.get(week).slots[(0, "lunch")].dish["name"], "Plat")
         self.assertEqual(plans.get(week + timedelta(days=7)).slots[(0, "lunch")].dish["name"], "Nou")
+
+    def test_pizza_reclassification_preserves_dish_recipe_photo_and_historical_menu(self):
+        from menus.application.recipes import save_recipe
+        from menus.domain.recipe import recipe_content
+        from menus.models import CatalogueSourceRecord, DishRecord, RecipeRecord
+
+        dishes, plans = DjangoDishRepository(), DjangoPlanningRepository()
+        current = date(2026, 11, 23)
+        past, future = current - timedelta(weeks=1), current + timedelta(weeks=1)
+        original = DishInput("Pizza de prova", "pasta", frozenset({"vegetables"}), "dinner", False)
+        dish_id = create_dish(dishes, original, uuid4())
+        digest = "a" * 64
+        CatalogueSourceRecord.objects.create(source_id=39, dish_id=dish_id, photo_digest=digest)
+        recipe = recipe_content("Cou la pizza.", [{"name": "Farina", "quantity": "150", "unit": "g"}], True)
+        save_recipe(dishes, Clock(past), dish_id, 1, recipe, True)
+        for week in (past, current, future):
+            change_menu(plans, Clock(past), week, (0, "dinner"), 0, "assign", dish_id)
+        frozen = plans.get(past)
+
+        url = reverse("dish_edit", args=[dish_id])
+        form = {"name": original.name, "preference": original.meal_preference, "version": 2}
+        for primary, secondary in (("pizza", ["pasta"]), ("pasta", ["pizza"])):
+            response = self.client.post(url, {**form, "primary": primary, "secondary": secondary})
+            self.assertContains(response, "La categoria Pizza només es pot triar com a categoria principal", status_code=400)
+        with patch("menus.web.catalogue.MadridClock", return_value=Clock(current)):
+            response = self.client.post(url, {**form, "primary": "pizza"})
+        detail = reverse("dish_detail", args=[dish_id])
+        self.assertRedirects(response, detail)
+
+        dish = DishRecord.objects.get(pk=dish_id)
+        self.assertEqual((dish.name, dish.primary_category_id, dish.meal_preference), (original.name, "pizza", "dinner"))
+        self.assertFalse(dish.secondary_categories.exists())
+        self.assertEqual(RecipeRecord.objects.get(dish_id=dish_id).published, recipe)
+        self.assertEqual(CatalogueSourceRecord.objects.get(pk=39).photo_digest, digest)
+        self.assertEqual(plans.get(past), frozen)
+        for week in (current, future):
+            snapshot = plans.get(week).slots[(0, "dinner")].dish
+            self.assertEqual(snapshot["dish_id"], dish_id)
+            self.assertEqual(snapshot["primary_category"], {"key": "pizza", "name": "Pizza"})
+            self.assertEqual(snapshot["secondary_categories"], [])
+            self.assertEqual(snapshot["recipe_content"], recipe)
+
+        catalogue = reverse("catalogue")
+        pizza = self.client.get(catalogue, {"category": "pizza"})
+        self.assertContains(pizza, f'href="{detail}"')
+        self.assertContains(pizza, "/static/menus/category-icons/pizza.svg")
+        self.assertNotContains(self.client.get(catalogue, {"category": "pasta"}), f'href="{detail}"')
 
     def test_recipe_effective_draft_and_publication_refresh(self):
         from menus.application.recipes import save_recipe

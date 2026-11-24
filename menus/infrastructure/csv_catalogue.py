@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 
 from menus.domain.catalogue import CatalogueDish
-from menus.domain.categories import CATEGORY_KEYS_BY_NAME, canonical_category_name
+from menus.domain.categories import CATEGORY_KEYS_BY_NAME, canonical_category_name, pizza_membership_is_valid
 
 
 class InvalidCatalogue(ValueError):
@@ -49,6 +49,9 @@ def read_catalogue(path: Path) -> list[CatalogueDish]:
                 if (any(value not in CATEGORY_KEYS_BY_NAME for value in categories)
                         or len(categories) != len(set(categories)) or primary in categories):
                     invalid(number, "secondary_categories", "invalid")
+                if not pizza_membership_is_valid(CATEGORY_KEYS_BY_NAME[primary],
+                                                 {CATEGORY_KEYS_BY_NAME[value] for value in categories}):
+                    invalid(number, "secondary_categories", "exclusive")
                 dishes.append(CatalogueDish(dish_id, row["name_ca"], primary, frozenset(categories), row["meal_preference"], row["special_occasion"] == "true"))
     except (csv.Error, UnicodeError) as exc:
         raise InvalidCatalogue("row=unknown field=csv code=invalid") from exc

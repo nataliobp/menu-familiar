@@ -177,6 +177,21 @@ Set `MENU_IMAGE` to the new verified tag printed by the script. Keep the same ad
 
 Repeat the health and trusted-device checks. If the migration or smoke check fails, use the recovery procedure with the matching pre-update backup and image.
 
+### Pizza catalogue update
+
+For an existing installation, take a [paired database and photo backup](docs/V2.0.0-RELEASE.md#start-stop-status-and-routine-backup), retain the previous image and configuration, and follow the update procedure above. Stop Menú Familiar before running the candidate migration. Migration 0012 adds the Pizza category row. The previous app expects the previous vocabulary, so start the candidate image after the migration succeeds. For rollback, use the matching pre-change backup and image.
+
+After startup, find the seeded Pizza dish by its stable source ID and open its editor.
+
+```bash
+./scripts/compose.sh exec -T menu-familiar python manage.py shell -c \
+  'from menus.models import CatalogueSourceRecord; print(CatalogueSourceRecord.objects.get(pk=39).dish_id)'
+```
+
+Open `/plats/<dish_id>/edit/`, select **Pizza** as the primary category, clear every secondary category, and save. Review any household-added pizza dishes in both the active and archived catalogue and apply the same edit. The editor preserves dish IDs, names, recipes, photo references and menu assignments. Editable snapshots refresh and past snapshots remain frozen. Check the Pizza and Pasta filters before completing the update.
+
+For a fresh install, use the corrected private CSV at `data/PLATOS_57-pizza.csv` if it is available on the installation host. Keep it outside Git. The original CSV and approved recipe bundle still describe the pre-change category. After importing the corrected seed, use the recipe importer's standard dry run and apply commands without the legacy catalogue option, since the fresh seed already provides stable source links. The CSV importer is insert-only and rejects category changes to existing dishes.
+
 ## Recovery
 
 Rehearse with a synthetic backup before relying on the procedure. For a production restore or rollback, stop the production service and use a new directory. Preserve the previous data directory and its SQLite sidecar files. The backup file must be the verified standalone snapshot.

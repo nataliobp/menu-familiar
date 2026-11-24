@@ -40,6 +40,10 @@ class CSVTests(TestCase):
         dish = self.parse([list(reversed(row))], headers)[0]
         self.assertEqual(dish.secondary_categories, frozenset({"Verdures", "Ous"}))
 
+    def test_pizza_is_accepted_as_the_only_category(self):
+        dish = self.parse([["1", "Pizza de prova", "Pizza", "", *ROW[4:]]])[0]
+        self.assertEqual((dish.primary_category, dish.secondary_categories), ("Pizza", frozenset()))
+
     def test_invalid_data_is_rejected(self):
         cases = [
             ([ROW, ROW], HEADERS),
@@ -55,6 +59,8 @@ class CSVTests(TestCase):
             ([[*ROW[:2], "Desconeguda", *ROW[3:]]], HEADERS),
             ([[*ROW[:3], "Verdures, Verdures", *ROW[4:]]], HEADERS),
             ([[*ROW[:3], "Cereals", *ROW[4:]]], HEADERS),
+            ([[*ROW[:2], "Pizza", "Pasta", *ROW[4:]]], HEADERS),
+            ([[*ROW[:2], "Pasta", "Pizza", *ROW[4:]]], HEADERS),
         ]
         for rows, headers in cases:
             with self.subTest(rows=rows, headers=headers), self.assertRaises(InvalidCatalogue):
