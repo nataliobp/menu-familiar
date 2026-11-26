@@ -50,7 +50,7 @@ class PwaTests(TestCase):
                               ("512x512", "maskable")})
             for icon in icons:
                 with self.subTest(icon=icon["sizes"]):
-                    self.assertRegex(icon["src"], r"^/static/menus/pwa/launcher-v2-(?:maskable-)?\d+\.[a-f0-9]+\.png$")
+                    self.assertRegex(icon["src"], r"^/static/menus/pwa/launcher-v3-(?:maskable-)?\d+\.[a-f0-9]+\.png$")
                     response = browser.get(icon["src"])
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.headers["Content-Type"], "image/png")
