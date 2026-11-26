@@ -272,7 +272,9 @@ class CutoverTests(unittest.TestCase):
             return original_command(label, args, **options)
 
         patch.object(deploy, "command", command_in_repo).start()
-        self.host = Host(run)
+        self.log = io.StringIO()
+        with redirect_stdout(self.log):
+            self.host = Host(run)
         self.host.database = self.root / "synthetic.sqlite3"
         self.host.database.write_text("synthetic original data")
         self.host.original_env.write_text(f"SECRET=synthetic-private\nMENU_IMAGE={OLD_IMAGE}\n")
@@ -296,7 +298,6 @@ class CutoverTests(unittest.TestCase):
             return healthy_response(url)
 
         self.enterContext(patch.object(AbstractHTTPHandler, "do_open", respond))
-        self.log = io.StringIO()
 
     @staticmethod
     def run_git(cwd, *args):

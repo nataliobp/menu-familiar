@@ -21,7 +21,9 @@ The command tests committed source in a temporary directory, builds and smoke-te
 
 The unattended migration gate allows atomic migrations that only add nullable scalar columns without defaults, uniqueness or indexes. It rehearses a supported plan on a disposable copy of the verified snapshot, then checks the plan again during application. Pending data migrations, destructive schema changes, unknown history and other operations require a separate owner-approved update. In particular, if `0012_pizza_category` is pending, use the [Pizza migration procedure](../README.md#updates) before adopting this workflow.
 
-`./deploy.sh --latest` prints the latest attempt's JSON Lines events. The run directory contains the test and Docker verification logs, timestamped events, previous image reference and content ID, previous image archive, saved Compose file and environment, and the verified paired data under `snapshot/data`. A run that stops early may contain only some of these files. Keep run directories private and retain good backups off-host. Review retention and available disk space as part of routine maintenance.
+On an interactive terminal, the launcher uses Rich when available to isolated system Python (`/usr/bin/python3 -I`). On Debian the optional host package is `python3-rich`. SSH with a PTY and tmux support the dashboard. Pipes, redirected output and installations without Rich use plain text. The display pauses for sudo. Ctrl+C uses the normal deployment recovery path.
+
+`./deploy.sh --latest` summarizes the latest attempt, including stage outcomes and elapsed times between recorded boundaries. For interrupted histories it shows the last recorded operation and time. Older histories begin timing health checks at the first recorded probe. For machine consumption read `events.jsonl` in the run directory. The run directory contains the test and Docker verification logs, timestamped events, previous image reference and content ID, previous image archive, saved Compose file and environment, and the verified paired data under `snapshot/data`. A run that stops early may contain only some of these files. Keep run directories private and retain good backups off-host. Review retention and available disk space as part of routine maintenance.
 
 A failed GitHub push leaves a successful deployment running and logs `sync_pending` with the commit and destination. Once access is restored, the owner can retry `git push <remote> <commit>:<target>` from that log. If the upstream has diverged, reconcile it through the normal Git workflow. Deployments never fetch or merge incoming changes.
 
@@ -34,3 +36,7 @@ A failed GitHub push leaves a successful deployment running and logs `sync_pendi
 - Recovery to a point-in-time backup excludes edits made after the snapshot. A failed migration may have committed changes even if a later migration failed. Restarting a previous image alone leaves those database changes in place.
 
 The host probes confirm reachable endpoints from the Home Server. Keep the existing [trusted and untrusted device checks](V2.0.1-RELEASE.md) for LAN and tailnet access control. Full workflow tests use disposable repositories, synthetic SQLite data and failure injection for Docker operations. Run them with `.venv/bin/python -m unittest discover -s scripts/tests -v`.
+
+## Dashboard preview
+
+From the checkout, run `/usr/bin/python3 -m scripts.tests.test_deploy_ui success` to play synthetic events through the same terminal view. Replace `success` with `failure`, `rollback`, `manual`, `rollback_failure` or `sync_pending` to preview other outcomes. Preview log paths are illustrative.

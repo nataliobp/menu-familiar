@@ -17,6 +17,13 @@ from urllib.parse import urljoin, urlsplit
 from urllib.request import HTTPErrorProcessor, ProxyHandler, build_opener
 
 REPO = Path(__file__).resolve().parents[1]
+if __package__:
+    from .deploy_ui import Dashboard, latest
+else:
+    # The owner launcher uses -I, which excludes the script directory.
+    sys.path.append(str(REPO / "scripts"))
+    from deploy_ui import Dashboard, latest
+
 STATE = Path.home() / "menu-familiar-deployments"
 DATA = "/var/lib/menu-familiar/data"
 SERVICE = "menu-familiar"
@@ -156,6 +163,7 @@ def smoke(tail_host, report):
 class Deployment:
     def __init__(self, run):
         self.run = run
+        self.view = Dashboard(run)
         self.original_env = REPO / ".env"
         self.saved_env = run / "production.env"
         self.candidate_env = run / "candidate.env"
@@ -169,17 +177,18 @@ class Deployment:
         self.stage = "preflight"
 
     def report(self, event, message, **fields):
+        record = {"timestamp": now(), "event": event, "message": message, **fields}
         with (self.run / "events.jsonl").open("a") as log:
-            log.write(json.dumps({"timestamp": now(), "event": event, "message": message, **fields}) + "\n")
+            log.write(json.dumps(record) + "\n")
             log.flush()
             os.fsync(log.fileno())
-        print(message, flush=True)
+        self.view.accept(record)
 
     def report_recovery(self, event, message, **fields):
         try:
             self.report(event, message, **fields)
         except OSError:
-            print(message, file=sys.stderr, flush=True)
+            self.view.accept({"event": event})
 
     def git(self, *args, **options):
         return command("Git " + args[0], ["git", *args], **options)
@@ -278,8 +287,9 @@ class Deployment:
             self.migration_script = (work / "scripts/deploy_migrations.py").read_bytes()
             verification_script = (work / "scripts/verify-docker.sh").read_bytes()
         self.report("tests_passed", "Django tests, deployment tests and migration coverage passed")
-        require(subprocess.run(["sudo", "-v"], env=SAFE_ENV, check=False).returncode == 0,
-                "Docker authorization failed")
+        with self.view.prompt():
+            require(subprocess.run(["sudo", "-v"], env=SAFE_ENV, check=False).returncode == 0,
+                    "Docker authorization failed")
         self.report("image_verification_started", "Building and verifying the committed image with disposable Docker resources")
         result = self.run / "verified-image"
         command("Docker build and verification",
@@ -349,7 +359,9 @@ class Deployment:
         require(stat.S_ISREG(mode) and not mode & 0o077, "Use a regular private .env file (chmod 600)")
         before = self.original_env.read_bytes()
         self.saved_env.write_bytes(before)
-        self.compose_file.write_bytes(subprocess.check_output(["git", "show", f"{commit}:compose.yaml"], cwd=REPO))
+        self.compose_file.write_bytes(subprocess.check_output(
+            ["git", "show", f"{commit}:compose.yaml"], cwd=REPO, stderr=subprocess.DEVNULL,
+        ))
         self.old_service = self.read_config(self.saved_env)
         self.old_container = self.current_container(self.saved_env)
         runtime = self.inspect_runtime(self.old_container)
@@ -418,6 +430,7 @@ class Deployment:
         self.report("deploying", "Recreating only the Menú Familiar container")
         self.replace_container(self.candidate_env, self.candidate, self.new_service)
         self.stage = "health checks"
+        self.report("checks_started", "Starting LAN and HTTPS checks")
         smoke(self.tail_host, self.report)
         self.stage = "recording deployment"
         require(self.original_env.read_bytes() == before, "Production .env changed during cutover")
@@ -479,8 +492,9 @@ def interrupted(signum, frame):
 def main(args):
     os.umask(0o077)
     if args == ["--latest"]:
-        latest = (STATE / "latest").read_text().strip()
-        print((STATE / latest / "events.jsonl").read_text(), end="")
+        run_name = (STATE / "latest").read_text().strip()
+        require(re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9_]+", run_name), "Invalid deployment history")
+        latest(STATE / run_name)
         return 0
     require(not args, "Usage: ./deploy.sh [--latest]")
     require(os.getuid() != 0, "Run as the authorized repository owner without sudo")
@@ -497,21 +511,24 @@ def main(args):
         run = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-"), dir=STATE))
         atomic_write(STATE / "latest", (run.name + "\n").encode())
         deploy = Deployment(run)
-        print(f"Deployment history: {run}", flush=True)
         for sig in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, interrupted)
-        try:
-            deploy.deploy()
-        except (Exception, KeyboardInterrupt) as error:
-            message = str(error) if isinstance(error, DeploymentError) else type(error).__name__
-            deploy.report_recovery("failed", f"Failed during {deploy.stage} ({message})")
+        exit_status = 0
+        with deploy.view.live():
             try:
-                deploy.recover()
+                deploy.deploy()
             except (Exception, KeyboardInterrupt) as error:
                 message = str(error) if isinstance(error, DeploymentError) else type(error).__name__
-                deploy.report_recovery("recovery_failed", f"Recovery needs owner attention ({message}). See {run}")
-            return 1
-    return 0
+                deploy.report_recovery("failed", f"Failed during {deploy.stage} ({message})")
+                try:
+                    deploy.recover()
+                except (Exception, KeyboardInterrupt) as error:
+                    message = str(error) if isinstance(error, DeploymentError) else type(error).__name__
+                    deploy.report_recovery("recovery_failed", f"Recovery needs owner attention ({message}). See {run}")
+                exit_status = 1
+        if not deploy.view.console:
+            deploy.view.summary()
+    return exit_status
 
 
 if __name__ == "__main__":
