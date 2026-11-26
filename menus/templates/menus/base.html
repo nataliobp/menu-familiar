@@ -7,13 +7,13 @@
   <meta name="theme-color" content="#286044">
   <title>{% block title %}Menú Familiar{% endblock %}</title>
   <link rel="manifest" href="{% url 'web_app_manifest' %}">
-  <link rel="apple-touch-icon" href="{% static 'menus/pwa/app-icon-192.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'menus/pwa/launcher-v2-192.png' %}">
   <link rel="stylesheet" href="{% static 'menus/app.css' %}">
   <script src="{% static 'menus/app.js' %}" defer></script>
 </head>
 <body>
   <header class="mast">
-    <a class="brand" href="{% url 'current_menu' %}"><img class="brand-icon" src="{% static 'menus/pwa/app-icon-192.png' %}" alt="" width="30" height="30">Menú Familiar</a>
+    <a class="brand" href="{% url 'current_menu' %}"><img class="brand-icon" src="{% static 'menus/pwa/header-v2-192.png' %}" alt="" width="30" height="30">Menú Familiar</a>
   </header>
   <main id="contingut">
     {% block notices %}{% include "menus/components/messages.html" %}{% endblock %}

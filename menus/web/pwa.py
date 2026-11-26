@@ -9,9 +9,9 @@ def manifest(request):
     icons = [
         {"src": static(f"menus/pwa/{name}.png"), "sizes": f"{size}x{size}",
          "type": "image/png", "purpose": purpose}
-        for name, size, purpose in (("app-icon-192", 192, "any"),
-                                    ("app-icon-512", 512, "any"),
-                                    ("app-icon-maskable-512", 512, "maskable"))
+        for name, size, purpose in (("launcher-v2-192", 192, "any"),
+                                    ("launcher-v2-512", 512, "any"),
+                                    ("launcher-v2-maskable-512", 512, "maskable"))
     ]
     return JsonResponse({
         "id": "/",
