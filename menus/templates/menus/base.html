@@ -13,7 +13,7 @@
 </head>
 <body>
   <header class="mast">
-    <a class="brand" href="{% url 'current_menu' %}">{% include "menus/components/icon.html" with name="plate" only %}Menú Familiar</a>
+    <a class="brand" href="{% url 'current_menu' %}"><img class="brand-icon" src="{% static 'menus/pwa/app-icon-192.png' %}" alt="" width="30" height="30">Menú Familiar</a>
   </header>
   <main id="contingut">
     {% block notices %}{% include "menus/components/messages.html" %}{% endblock %}
