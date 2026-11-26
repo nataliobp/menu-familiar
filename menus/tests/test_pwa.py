@@ -45,10 +45,12 @@ class PwaTests(TestCase):
             browser = Client(HTTP_HOST="localhost")
             icons = browser.get(reverse("web_app_manifest")).json()["icons"]
             self.assertEqual({icon["sizes"] for icon in icons}, {"192x192", "512x512"})
-            self.assertTrue(any("maskable" in icon["purpose"].split() for icon in icons))
+            self.assertEqual({(icon["sizes"], icon["purpose"]) for icon in icons},
+                             {("192x192", "any"), ("512x512", "any"),
+                              ("512x512", "maskable")})
             for icon in icons:
                 with self.subTest(icon=icon["sizes"]):
-                    self.assertRegex(icon["src"], r"^/static/menus/pwa/icon-\d+\.[a-f0-9]+\.png$")
+                    self.assertRegex(icon["src"], r"^/static/menus/pwa/app-icon-(?:maskable-)?\d+\.[a-f0-9]+\.png$")
                     response = browser.get(icon["src"])
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.headers["Content-Type"], "image/png")

@@ -7,9 +7,11 @@ from django.views.decorators.http import require_safe
 @require_safe
 def manifest(request):
     icons = [
-        {"src": static(f"menus/pwa/icon-{size}.png"), "sizes": f"{size}x{size}",
+        {"src": static(f"menus/pwa/{name}.png"), "sizes": f"{size}x{size}",
          "type": "image/png", "purpose": purpose}
-        for size, purpose in ((192, "any"), (512, "any maskable"))
+        for name, size, purpose in (("app-icon-192", 192, "any"),
+                                    ("app-icon-512", 512, "any"),
+                                    ("app-icon-maskable-512", 512, "maskable"))
     ]
     return JsonResponse({
         "id": "/",
